@@ -1,14 +1,5 @@
-'use strict';
-
-Object.defineProperty(exports, '__esModule', { value: true });
-
-var path = require('path');
-var fs = require('fs');
-
-function _interopDefaultLegacy (e) { return e && typeof e === 'object' && 'default' in e ? e : { 'default': e }; }
-
-var path__default = /*#__PURE__*/_interopDefaultLegacy(path);
-var fs__default = /*#__PURE__*/_interopDefaultLegacy(fs);
+import path from 'path';
+import fs from 'fs';
 
 function asyncAction(funcs, initData) {
     return new Promise((resolve, reject) => {
@@ -563,11 +554,11 @@ class DirectoryModel {
     }
 }
 const readDirectory = async function (dir, filePath, callback) {
-    return await Promise.all(dir.map((file) => readFileTree(path__default["default"].join(filePath, file), callback)));
+    return await Promise.all(dir.map((file) => readFileTree(path.join(filePath, file), callback)));
 };
 const readFileTree = async function (url, callback) {
-    const ParsedPath = path__default["default"].parse(url);
-    const stat = await fs__default["default"].promises.stat(url);
+    const ParsedPath = path.parse(url);
+    const stat = await fs.promises.stat(url);
     if (stat.isFile()) {
         const fileData = new FileModel({
             url,
@@ -581,7 +572,7 @@ const readFileTree = async function (url, callback) {
         return fileData;
     }
     else {
-        const dir = await fs__default["default"].promises.readdir(url);
+        const dir = await fs.promises.readdir(url);
         const children = await readDirectory(dir, url, callback);
         const dirData = new DirectoryModel({ url, ...ParsedPath, children });
         if (callback)
@@ -590,51 +581,4 @@ const readFileTree = async function (url, callback) {
     }
 };
 
-exports.DirectoryModel = DirectoryModel;
-exports.FileModel = FileModel;
-exports.FileName = FileName;
-exports.HttpError = HttpError;
-exports.asyncAction = asyncAction;
-exports.bufferToString = bufferToString;
-exports.cloneJson = cloneJson;
-exports.createFileName = createFileName;
-exports.eachTree = eachTree;
-exports.filter = filter;
-exports.findNode = findNode;
-exports.findNodeAll = findNodeAll;
-exports.findPath = findPath;
-exports.findPathAll = findPathAll;
-exports.forEach = forEach;
-exports.formDataFormat = formDataFormat;
-exports.formUrlEncodedFormat = formUrlEncodedFormat;
-exports.handleErrorLog = handleErrorLog;
-exports.handleHttpErrorLog = handleHttpErrorLog;
-exports.handleWarningLog = handleWarningLog;
-exports.is = is;
-exports.isArrayBufferView = isArrayBufferView;
-exports.isArrayEmpty = isArrayEmpty;
-exports.isBlobEmpty = isBlobEmpty;
-exports.isClass = isClass;
-exports.isDarkMode = isDarkMode;
-exports.isEmpty = isEmpty;
-exports.isNumberEmpty = isNumberEmpty;
-exports.isObjectEmpty = isObjectEmpty;
-exports.isStringEmpty = isStringEmpty;
-exports.isTextExcludes = isTextExcludes;
-exports.isTextIncludes = isTextIncludes;
-exports.jsonToString = jsonToString;
-exports.listToTree = listToTree;
-exports.messageFormat = messageFormat;
-exports.nameToKebabCase = nameToKebabCase;
-exports.nameToLowerHumpCase = nameToLowerHumpCase;
-exports.nameToSnakeCase = nameToSnakeCase;
-exports.nameToUpperHumpCase = nameToUpperHumpCase;
-exports.readDirectory = readDirectory;
-exports.readFileTree = readFileTree;
-exports.stringToJson = stringToJson;
-exports.transformFileSize = transformFileSize;
-exports.treeMap = treeMap;
-exports.treeMapEach = treeMapEach;
-exports.treeToList = treeToList;
-exports.uuid = uuid;
-exports.uuidDate = uuidDate;
+export { DirectoryModel, FileModel, FileName, HttpError, asyncAction, bufferToString, cloneJson, createFileName, eachTree, filter, findNode, findNodeAll, findPath, findPathAll, forEach, formDataFormat, formUrlEncodedFormat, handleErrorLog, handleHttpErrorLog, handleWarningLog, is, isArrayBufferView, isArrayEmpty, isBlobEmpty, isClass, isDarkMode, isEmpty, isNumberEmpty, isObjectEmpty, isStringEmpty, isTextExcludes, isTextIncludes, jsonToString, listToTree, messageFormat, nameToKebabCase, nameToLowerHumpCase, nameToSnakeCase, nameToUpperHumpCase, readDirectory, readFileTree, stringToJson, transformFileSize, treeMap, treeMapEach, treeToList, uuid, uuidDate };

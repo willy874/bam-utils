@@ -1,5 +1,6 @@
 import path from "path";
 import fs from "fs";
+
 interface ParsedPath {
   root: string;
   dir: string;

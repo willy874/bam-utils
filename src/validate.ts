@@ -1,6 +1,7 @@
 import { isEmpty, isTextIncludes } from "./condition";
 import { handleWarningLog } from "./error";
-import { blobToBase64, urlToImageElement, transformFileSize } from "./image";
+import { urlToImageElement, blobToBase64 } from "./browser";
+import { transformFileSize } from "./transform";
 
 interface BaseValidateOption<M> {
   message?: string;
