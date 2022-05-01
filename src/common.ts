@@ -77,3 +77,11 @@ export function jsonToString<
   const data = typeof param !== "undefined" ? param : this;
   return JSON.stringify(data);
 }
+
+export const sleep = (t: number): Promise<void> => {
+  return new Promise<void>((resolve) => {
+    setTimeout(() => {
+      resolve();
+    }, t);
+  });
+};
