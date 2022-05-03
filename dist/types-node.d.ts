@@ -14,6 +14,7 @@ declare function formUrlEncodedFormat(data: JsonObject): URLSearchParams;
 declare function cloneJson(obj: unknown): JsonValue;
 declare function stringToJson<T extends string | void>(this: T, param: string): JsonValue;
 declare function jsonToString<T extends Record<string | number | symbol, unknown> | void>(this: T, param: JsonValue): string;
+declare const sleep: (t: number) => Promise<void>;
 
 declare function isDarkMode(): boolean;
 declare function isClass(value: unknown): value is DateConstructor;
@@ -147,4 +148,4 @@ declare type ReadFileCallback<T> = (url: string, fileData: FileModel | Directory
 declare const readDirectory: <T>(dir: string[], filePath: string, callback?: ReadFileCallback<T> | undefined) => Promise<Array<FileModel | DirectoryModel>>;
 declare const readFileTree: <T>(url: string, callback?: ReadFileCallback<T> | undefined) => Promise<FileModel | DirectoryModel>;
 
-export { DirectoryModel, FileModel, FileName, FormDataObject, FormDataValue, HttpError, IDirectoryModel, IFileModel, JsonObject, JsonValue, ReadFileCallback, asyncAction, bufferToString, cloneJson, createFileName, eachTree, filter, findNode, findNodeAll, findPath, findPathAll, forEach, formDataFormat, formUrlEncodedFormat, handleErrorLog, handleHttpErrorLog, handleWarningLog, is, isArrayBufferView, isArrayEmpty, isBlobEmpty, isClass, isDarkMode, isEmpty, isNumberEmpty, isObjectEmpty, isStringEmpty, isTextExcludes, isTextIncludes, jsonToString, listToTree, messageFormat, nameToKebabCase, nameToLowerHumpCase, nameToSnakeCase, nameToUpperHumpCase, readDirectory, readFileTree, stringToJson, transformFileSize, treeMap, treeMapEach, treeToList, uuid, uuidDate };
+export { DirectoryModel, FileModel, FileName, FormDataObject, FormDataValue, HttpError, IDirectoryModel, IFileModel, JsonObject, JsonValue, ReadFileCallback, asyncAction, bufferToString, cloneJson, createFileName, eachTree, filter, findNode, findNodeAll, findPath, findPathAll, forEach, formDataFormat, formUrlEncodedFormat, handleErrorLog, handleHttpErrorLog, handleWarningLog, is, isArrayBufferView, isArrayEmpty, isBlobEmpty, isClass, isDarkMode, isEmpty, isNumberEmpty, isObjectEmpty, isStringEmpty, isTextExcludes, isTextIncludes, jsonToString, listToTree, messageFormat, nameToKebabCase, nameToLowerHumpCase, nameToSnakeCase, nameToUpperHumpCase, readDirectory, readFileTree, sleep, stringToJson, transformFileSize, treeMap, treeMapEach, treeToList, uuid, uuidDate };

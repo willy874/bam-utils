@@ -86,6 +86,13 @@ function jsonToString(param) {
     const data = typeof param !== "undefined" ? param : this;
     return JSON.stringify(data);
 }
+const sleep = (t) => {
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            resolve();
+        }, t);
+    });
+};
 
 function isDarkMode() {
     const mediaQuery = matchMedia("(prefers-color-scheme: dark)");
@@ -581,4 +588,4 @@ const readFileTree = async function (url, callback) {
     }
 };
 
-export { DirectoryModel, FileModel, FileName, HttpError, asyncAction, bufferToString, cloneJson, createFileName, eachTree, filter, findNode, findNodeAll, findPath, findPathAll, forEach, formDataFormat, formUrlEncodedFormat, handleErrorLog, handleHttpErrorLog, handleWarningLog, is, isArrayBufferView, isArrayEmpty, isBlobEmpty, isClass, isDarkMode, isEmpty, isNumberEmpty, isObjectEmpty, isStringEmpty, isTextExcludes, isTextIncludes, jsonToString, listToTree, messageFormat, nameToKebabCase, nameToLowerHumpCase, nameToSnakeCase, nameToUpperHumpCase, readDirectory, readFileTree, stringToJson, transformFileSize, treeMap, treeMapEach, treeToList, uuid, uuidDate };
+export { DirectoryModel, FileModel, FileName, HttpError, asyncAction, bufferToString, cloneJson, createFileName, eachTree, filter, findNode, findNodeAll, findPath, findPathAll, forEach, formDataFormat, formUrlEncodedFormat, handleErrorLog, handleHttpErrorLog, handleWarningLog, is, isArrayBufferView, isArrayEmpty, isBlobEmpty, isClass, isDarkMode, isEmpty, isNumberEmpty, isObjectEmpty, isStringEmpty, isTextExcludes, isTextIncludes, jsonToString, listToTree, messageFormat, nameToKebabCase, nameToLowerHumpCase, nameToSnakeCase, nameToUpperHumpCase, readDirectory, readFileTree, sleep, stringToJson, transformFileSize, treeMap, treeMapEach, treeToList, uuid, uuidDate };

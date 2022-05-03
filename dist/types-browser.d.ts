@@ -14,6 +14,7 @@ declare function formUrlEncodedFormat(data: JsonObject): URLSearchParams;
 declare function cloneJson(obj: unknown): JsonValue;
 declare function stringToJson<T extends string | void>(this: T, param: string): JsonValue;
 declare function jsonToString<T extends Record<string | number | symbol, unknown> | void>(this: T, param: JsonValue): string;
+declare const sleep: (t: number) => Promise<void>;
 
 declare function isDarkMode(): boolean;
 declare function isClass(value: unknown): value is DateConstructor;
@@ -183,4 +184,4 @@ interface TransformStyle {
 }
 declare function getTransformStyleString(transform: TransformStyle): string;
 
-export { FileName, FormDataObject, FormDataValue, HttpError, JsonObject, JsonValue, TransformStyle, ValidateField, ValidateOption, Validator, ValidatorHandler, ValidatorHandlerOption, ValidatorValidOption, ViewportOffsetResult, asyncAction, base64toBlob, blobToBase64, bufferToString, clearDragImage, cloneJson, createFileName, eachTree, filter, findNode, findNodeAll, findPath, findPathAll, forEach, formDataFormat, formUrlEncodedFormat, getBoundingClientRect, getTransformStyleString, getViewportOffset, handleErrorLog, handleHttpErrorLog, handleWarningLog, imageToBase64, is, isArrayBufferView, isArrayEmpty, isBlobEmpty, isBrowserSupported, isClass, isDarkMode, isEmpty, isHeaders, isNumberEmpty, isObjectEmpty, isRequest, isResponse, isStringEmpty, isTextExcludes, isTextIncludes, jsonToString, listToTree, messageFormat, nameToKebabCase, nameToLowerHumpCase, nameToSnakeCase, nameToUpperHumpCase, stringToJson, transformFileSize, treeMap, treeMapEach, treeToList, urlToImageElement, uuid, uuidDate };
+export { FileName, FormDataObject, FormDataValue, HttpError, JsonObject, JsonValue, TransformStyle, ValidateField, ValidateOption, Validator, ValidatorHandler, ValidatorHandlerOption, ValidatorValidOption, ViewportOffsetResult, asyncAction, base64toBlob, blobToBase64, bufferToString, clearDragImage, cloneJson, createFileName, eachTree, filter, findNode, findNodeAll, findPath, findPathAll, forEach, formDataFormat, formUrlEncodedFormat, getBoundingClientRect, getTransformStyleString, getViewportOffset, handleErrorLog, handleHttpErrorLog, handleWarningLog, imageToBase64, is, isArrayBufferView, isArrayEmpty, isBlobEmpty, isBrowserSupported, isClass, isDarkMode, isEmpty, isHeaders, isNumberEmpty, isObjectEmpty, isRequest, isResponse, isStringEmpty, isTextExcludes, isTextIncludes, jsonToString, listToTree, messageFormat, nameToKebabCase, nameToLowerHumpCase, nameToSnakeCase, nameToUpperHumpCase, sleep, stringToJson, transformFileSize, treeMap, treeMapEach, treeToList, urlToImageElement, uuid, uuidDate };

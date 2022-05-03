@@ -1,5 +1,5 @@
 {
-  "name": "bam-utils",
+  "name": "bamboo-utils",
   "version": "0.2.2",
   "scripts": {
     "build": "rollup -c",
@@ -9,19 +9,14 @@
   "main": "./dist",
   "types": "./dist/types.d.ts",
   "description": "Bamboo Function Utility Plugin.",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/willy874/bam-utilis.git"
-  },
   "keywords": [
     "bamboo",
-    "bam-utils",
-    "bamboo-utility",
     "bamboo-utils",
+    "bamboo-utility",
     "utils",
     "utility"
   ],
-  "author": "willy",
+  "author": "willy874",
   "devDependencies": {
     "@rollup/plugin-alias": "^3.0.0",
     "@rollup/plugin-image": "^2.0.1",

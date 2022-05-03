@@ -83,6 +83,13 @@ function jsonToString(param) {
     const data = typeof param !== "undefined" ? param : this;
     return JSON.stringify(data);
 }
+const sleep = (t) => {
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            resolve();
+        }, t);
+    });
+};
 
 function isDarkMode() {
     const mediaQuery = matchMedia("(prefers-color-scheme: dark)");
@@ -905,4 +912,4 @@ function getTransformStyleString(transform) {
   `;
 }
 
-export { FileName, HttpError, Validator, asyncAction, base64toBlob, blobToBase64, bufferToString, clearDragImage, cloneJson, createFileName, eachTree, filter, findNode, findNodeAll, findPath, findPathAll, forEach, formDataFormat, formUrlEncodedFormat, getBoundingClientRect, getTransformStyleString, getViewportOffset, handleErrorLog, handleHttpErrorLog, handleWarningLog, imageToBase64, is, isArrayBufferView, isArrayEmpty, isBlobEmpty, isBrowserSupported, isClass, isDarkMode, isEmpty, isHeaders, isNumberEmpty, isObjectEmpty, isRequest, isResponse, isStringEmpty, isTextExcludes, isTextIncludes, jsonToString, listToTree, messageFormat, nameToKebabCase, nameToLowerHumpCase, nameToSnakeCase, nameToUpperHumpCase, stringToJson, transformFileSize, treeMap, treeMapEach, treeToList, urlToImageElement, uuid, uuidDate };
+export { FileName, HttpError, Validator, asyncAction, base64toBlob, blobToBase64, bufferToString, clearDragImage, cloneJson, createFileName, eachTree, filter, findNode, findNodeAll, findPath, findPathAll, forEach, formDataFormat, formUrlEncodedFormat, getBoundingClientRect, getTransformStyleString, getViewportOffset, handleErrorLog, handleHttpErrorLog, handleWarningLog, imageToBase64, is, isArrayBufferView, isArrayEmpty, isBlobEmpty, isBrowserSupported, isClass, isDarkMode, isEmpty, isHeaders, isNumberEmpty, isObjectEmpty, isRequest, isResponse, isStringEmpty, isTextExcludes, isTextIncludes, jsonToString, listToTree, messageFormat, nameToKebabCase, nameToLowerHumpCase, nameToSnakeCase, nameToUpperHumpCase, sleep, stringToJson, transformFileSize, treeMap, treeMapEach, treeToList, urlToImageElement, uuid, uuidDate };

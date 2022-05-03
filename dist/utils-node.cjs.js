@@ -95,6 +95,13 @@ function jsonToString(param) {
     const data = typeof param !== "undefined" ? param : this;
     return JSON.stringify(data);
 }
+const sleep = (t) => {
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            resolve();
+        }, t);
+    });
+};
 
 function isDarkMode() {
     const mediaQuery = matchMedia("(prefers-color-scheme: dark)");
@@ -631,6 +638,7 @@ exports.nameToSnakeCase = nameToSnakeCase;
 exports.nameToUpperHumpCase = nameToUpperHumpCase;
 exports.readDirectory = readDirectory;
 exports.readFileTree = readFileTree;
+exports.sleep = sleep;
 exports.stringToJson = stringToJson;
 exports.transformFileSize = transformFileSize;
 exports.treeMap = treeMap;
