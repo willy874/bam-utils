@@ -1,14 +1,22 @@
+import { ClassConstructor } from "./types";
+
 export function isDarkMode(): boolean {
   const mediaQuery = matchMedia("(prefers-color-scheme: dark)");
   return mediaQuery.matches;
 }
 
-export function isClass(value: unknown): value is DateConstructor {
+export function isClass(value: unknown): value is ClassConstructor {
   return (
     Object.prototype.toString.call(value) === "[object Function]" &&
     typeof value === "function" &&
     "constructor" in value
   );
+}
+
+export function isAsyncFunction(
+  value: unknown
+): value is (...args: any[]) => Promise<any> {
+  return Object.prototype.toString.call(value) === "[object AsyncFunction]";
 }
 
 export function isArrayEmpty(value: unknown): value is Array<void> {
@@ -79,7 +87,10 @@ export function isTextExcludes(
   return true;
 }
 
-export function is<T extends DateConstructor>(val: unknown, type: T): val is T {
+export function is<T extends ClassConstructor>(
+  val: unknown,
+  type: T
+): val is T {
   return Object.prototype.toString.call(val) === `[object ${type.name}]`;
 }
 

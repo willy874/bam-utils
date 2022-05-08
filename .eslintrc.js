@@ -15,7 +15,11 @@ module.exports = {
     'plugin:@typescript-eslint/recommended',
     'prettier'
   ],
-  rules: {},
+  rules: {
+    "@typescript-eslint/no-explicit-any": "off",
+    "@typescript-eslint/explicit-module-boundary-types": "off",
+    "@typescript-eslint/no-non-null-assertion": "off"
+  },
   settings: {
     'import/resolver': {
       alias: {

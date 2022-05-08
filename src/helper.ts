@@ -1,19 +1,26 @@
+import { AnyFunction } from "./types";
+import { isAsyncFunction } from "./condition";
+
 interface TreeHelperConfig {
   id: string;
   children: string;
   pid: string;
 }
 const DEFAULT_CONFIG: TreeHelperConfig = {
-  id: 'id',
-  children: 'children',
-  pid: 'pid',
+  id: "id",
+  children: "children",
+  pid: "pid",
 };
 
-const getConfig = (config: Partial<TreeHelperConfig>) => Object.assign({}, DEFAULT_CONFIG, config);
+const getConfig = (config: Partial<TreeHelperConfig>): TreeHelperConfig => {
+  return Object.assign({}, DEFAULT_CONFIG, config);
+};
 
-// tree from list
-export function listToTree<T = any>(list: any[], config: Partial<TreeHelperConfig> = {}): T[] {
-  const conf = getConfig(config) as TreeHelperConfig;
+export function listToTree<T = any>(
+  list: any[],
+  config: Partial<TreeHelperConfig> = {}
+): T[] {
+  const conf = getConfig(config);
   const nodeMap = new Map();
   const result: T[] = [];
   const { id, children, pid } = conf;
@@ -29,7 +36,10 @@ export function listToTree<T = any>(list: any[], config: Partial<TreeHelperConfi
   return result;
 }
 
-export function treeToList<T = any>(tree: any, config: Partial<TreeHelperConfig> = {}): T {
+export function treeToList<T = any>(
+  tree: any,
+  config: Partial<TreeHelperConfig> = {}
+): T {
   config = getConfig(config);
   const { children } = config;
   const result: any = [...tree];
@@ -42,8 +52,8 @@ export function treeToList<T = any>(tree: any, config: Partial<TreeHelperConfig>
 
 export function findNode<T = any>(
   tree: any,
-  func: Function,
-  config: Partial<TreeHelperConfig> = {},
+  func: AnyFunction,
+  config: Partial<TreeHelperConfig> = {}
 ): T | null {
   config = getConfig(config);
   const { children } = config;
@@ -57,8 +67,8 @@ export function findNode<T = any>(
 
 export function findNodeAll<T = any>(
   tree: any,
-  func: Function,
-  config: Partial<TreeHelperConfig> = {},
+  func: AnyFunction,
+  config: Partial<TreeHelperConfig> = {}
 ): T[] {
   config = getConfig(config);
   const { children } = config;
@@ -73,8 +83,8 @@ export function findNodeAll<T = any>(
 
 export function findPath<T = any>(
   tree: any,
-  func: Function,
-  config: Partial<TreeHelperConfig> = {},
+  func: AnyFunction,
+  config: Partial<TreeHelperConfig> = {}
 ): T | T[] | null {
   config = getConfig(config);
   const path: T[] = [];
@@ -98,7 +108,11 @@ export function findPath<T = any>(
   return null;
 }
 
-export function findPathAll(tree: any, func: Function, config: Partial<TreeHelperConfig> = {}) {
+export function findPathAll(
+  tree: any,
+  func: AnyFunction,
+  config: Partial<TreeHelperConfig> = {}
+) {
   config = getConfig(config);
   const path: any[] = [];
   const list = [...tree];
@@ -123,7 +137,7 @@ export function findPathAll(tree: any, func: Function, config: Partial<TreeHelpe
 export function filter<T = any>(
   tree: T[],
   func: (n: T) => boolean,
-  config: Partial<TreeHelperConfig> = {},
+  config: Partial<TreeHelperConfig> = {}
 ): T[] {
   config = getConfig(config);
   const children = config.children as string;
@@ -138,27 +152,40 @@ export function filter<T = any>(
   return listFilter(tree);
 }
 
-export function forEach<T = any>(
+export async function forEach<T = any>(
   tree: T[],
   func: (n: T) => any,
-  config: Partial<TreeHelperConfig> = {},
-): void {
+  config: Partial<TreeHelperConfig> = {}
+) {
   config = getConfig(config);
   const list: any[] = [...tree];
   const { children } = config;
   for (let i = 0; i < list.length; i++) {
-    //func 返回true就终止遍历，避免大量节点场景下无意义循环，引起浏览器卡顿
-    if (func(list[i])) {
-      return;
+    if (isAsyncFunction(func)) {
+      if (await func(list[i])) {
+        return;
+      }
+    } else {
+      const result = func(list[i]);
+      if (result instanceof Promise && (await result)) {
+        return;
+      } else if (result) {
+        return;
+      }
     }
-    children && list[i][children] && list.splice(i + 1, 0, ...list[i][children]);
+    children &&
+      list[i][children] &&
+      list.splice(i + 1, 0, ...list[i][children]);
   }
 }
 
 /**
  * @description: Extract tree specified structure
  */
-export function treeMap<T = any>(treeData: T[], opt: { children?: string; conversion: Function }): T[] {
+export function treeMap<T = any>(
+  treeData: T[],
+  opt: { children?: string; conversion: AnyFunction }
+): T[] {
   return treeData.map((item) => treeMapEach(item, opt));
 }
 
@@ -167,9 +194,13 @@ export function treeMap<T = any>(treeData: T[], opt: { children?: string; conver
  */
 export function treeMapEach(
   data: any,
-  { children = 'children', conversion }: { children?: string; conversion: Function },
+  {
+    children = "children",
+    conversion,
+  }: { children?: string; conversion: AnyFunction }
 ) {
-  const haveChildren = Array.isArray(data[children]) && data[children].length > 0;
+  const haveChildren =
+    Array.isArray(data[children]) && data[children].length > 0;
   const conversionData = conversion(data) || {};
   if (haveChildren) {
     return {
@@ -178,7 +209,7 @@ export function treeMapEach(
         treeMapEach(i, {
           children,
           conversion,
-        }),
+        })
       ),
     };
   } else {
@@ -188,17 +219,15 @@ export function treeMapEach(
   }
 }
 
-/**
- * 递归遍历树结构
- * @param treeDatas 树
- * @param callBack 回调
- * @param parentNode 父节点
- */
-export function eachTree(treeDatas: any[], callBack: Function, parentNode = {}) {
+export function eachElementTree(
+  treeDatas: Array<Element>,
+  callBack: AnyFunction,
+  parentNode = {}
+) {
   treeDatas.forEach((element) => {
     const newNode = callBack(element, parentNode) || element;
     if (element.children) {
-      eachTree(element.children, callBack, newNode);
+      eachElementTree(Array.from(element.children), callBack, newNode);
     }
   });
 }
