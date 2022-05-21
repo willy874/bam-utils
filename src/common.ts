@@ -85,3 +85,55 @@ export const sleep = (t: number): Promise<void> => {
     }, t);
   });
 };
+
+export const optionsOnlyOrList = function <T>(
+  param: T | T[],
+  callback: (item: T, index?: number) => void
+) {
+  if (Array.isArray(param)) {
+    param.forEach((item, index) => callback(item, index));
+  } else {
+    callback(param);
+  }
+};
+
+export const optionsListOrCollection = function <T>(
+  param: T[] | { [key: string]: T },
+  callback: (item: T, index?: string) => void
+) {
+  if (Array.isArray(param)) {
+    param.forEach((item, index) => callback(item, String(index)));
+  } else {
+    Object.keys(param).forEach((key) => callback(param[key], key));
+  }
+};
+
+export type ConditionString = string | string[] | RegExp | RegExp[] | undefined;
+
+export function checkStringIsEvery(value: string, condition: ConditionString) {
+  const bools: boolean[] = [];
+  optionsOnlyOrList(condition, (item) => {
+    if (typeof item === "string") {
+      bools.push(value.includes(item));
+    } else if (item instanceof RegExp) {
+      bools.push(item.test(value));
+    } else {
+      bools.push(false);
+    }
+  });
+  return bools.every(Boolean);
+}
+
+export function checkStringIsSome(value: string, condition: ConditionString) {
+  const bools: boolean[] = [];
+  optionsOnlyOrList(condition, (item) => {
+    if (typeof item === "string") {
+      bools.push(value.includes(item));
+    } else if (item instanceof RegExp) {
+      bools.push(item.test(value));
+    } else {
+      bools.push(false);
+    }
+  });
+  return bools.some(Boolean);
+}

@@ -1,6 +1,7 @@
 import path, { ParsedPath } from "path";
 import fs, { RmOptions } from "fs";
 import { Stream } from "stream";
+import { checkStringIsSome } from "../common";
 import { is } from "../condition";
 import { forEach } from "../helper";
 
@@ -157,32 +158,40 @@ export type ReadDirCallback = (
   fileData: DirectoryModel
 ) => DirectoryModel | void;
 
+interface ReadFileTreeOptions {
+  readFile?: ReadFileCallback;
+  readDir?: ReadDirCallback;
+  ignore?: string | string[] | RegExp | RegExp[];
+}
+
 export const readDirectory = async function (
-  dir: string[],
   url: string,
-  readFile?: ReadFileCallback,
-  readDir?: ReadDirCallback
+  options?: Partial<ReadFileTreeOptions>
 ): Promise<Array<FileModel | DirectoryModel> | null> {
+  const dir = await fs.promises.readdir(url);
   if (!fs.existsSync(url)) {
     console.error(`There are no files for "${url}".`);
     return null;
   }
   const dirData = await Promise.all(
-    dir.map((file) => readFileTree(path.join(url, file), readFile, readDir))
+    dir.map((file) => readFileTree(path.join(url, file), options))
   );
   return dirData.filter(isFileNotEmpty);
 };
 
 export const readFileTree = async function (
   url: string,
-  readFile?: ReadFileCallback,
-  readDir?: ReadDirCallback
+  options?: Partial<ReadFileTreeOptions>
 ): Promise<FileModel | DirectoryModel | null> {
-  const ParsedPath = path.parse(url);
+  const { readFile, readDir, ignore } = options || {};
+  if (checkStringIsSome(url, ignore)) {
+    return null;
+  }
   if (!fs.existsSync(url)) {
     console.error(`There are no files for "${url}".`);
     return null;
   }
+  const ParsedPath = path.parse(url);
   const stat = await fs.promises.stat(url);
   if (stat.isFile()) {
     const fileData = new FileModel({
@@ -198,8 +207,7 @@ export const readFileTree = async function (
     }
     return fileData;
   } else {
-    const dir = await fs.promises.readdir(url);
-    const children = await readDirectory(dir, url, readFile);
+    const children = await readDirectory(url, options);
     const dirData = new DirectoryModel({
       url,
       ...ParsedPath,
