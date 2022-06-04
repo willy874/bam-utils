@@ -24,3 +24,7 @@ export function transformFileSize(value: unknown): number {
   }
   return NaN;
 }
+
+// multipart
+// { ContentType, boundary }
+// str.replace(/^(\n|\n\r|\s)*/, '').replace(/(\n|\n\r|\s)*$/, '').split(boundary).filter(Boolean).map(s => s.split(/\; /))
