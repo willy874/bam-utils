@@ -1,3 +1,5 @@
+export * from "./storage";
+
 export function isBrowserSupported(key: string): boolean {
   return typeof Window !== "undefined" && key in window;
 }
