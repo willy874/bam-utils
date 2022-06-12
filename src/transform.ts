@@ -25,6 +25,21 @@ export function transformFileSize(value: unknown): number {
   return NaN;
 }
 
-// multipart
-// { ContentType, boundary }
-// str.replace(/^(\n|\n\r|\s)*/, '').replace(/(\n|\n\r|\s)*$/, '').split(boundary).filter(Boolean).map(s => s.split(/\; /))
+export function getUrlObject(url: string) {
+  const [u1, u2] = url.split(/:\/\//);
+  const protocol = u2 ? u1 : "";
+  const [u3, ...u4] = protocol ? u2.split("/") : u1.split("/");
+  const host = protocol ? u3 : "";
+  const u5 = protocol ? [...u4] : [u3, ...u4];
+  const [hostname, port] = host ? host.split(":") : ["", ""];
+  const [pathname, params] = u5.join("/").split("?");
+  const [search, hash] = params ? params.split("#") : ["", ""];
+  return {
+    protocol: protocol || location.protocol.replace(/:$/, ""),
+    hostname: hostname || location.hostname,
+    port: port || location.port || "",
+    pathname,
+    query: new URLSearchParams(search || ""),
+    hash: hash || "",
+  };
+}

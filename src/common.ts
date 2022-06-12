@@ -137,3 +137,12 @@ export function checkStringIsSome(value: string, condition: ConditionString) {
   });
   return bools.some(Boolean);
 }
+
+export function log(arg: unknown, ...args: unknown[]) {
+  if (typeof arg === "object" && arg) {
+    console.dir(arg);
+    return arg;
+  }
+  console.log(arg, ...args);
+  return arg;
+}

@@ -1,9 +1,9 @@
-type AsyncFunction<T> = (...args: T[]) => Promise<T>;
+type AsyncFunction = (...args: any[]) => Promise<any> | any;
 
-export function asyncAction<T = unknown>(
-  funcs: AsyncFunction<T>[],
-  initData: T
-): Promise<T> {
+export function asyncAction<T extends AsyncFunction>(
+  funcs: T[],
+  initData: Parameters<AsyncFunction>[0]
+): Promise<any> {
   return new Promise<T>((resolve, reject) => {
     (async function () {
       let data = initData;

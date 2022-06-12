@@ -1,9 +1,10 @@
 import { stringToRegExp } from "../rexexp";
 import { asyncAction } from "../async";
+import { getUrlObject } from "../transform";
 
 export function assignRequest(
   req: Request,
-  options: RequestInit & { url: string; body: BodyInit | null }
+  options: RequestInit & { url: string }
 ) {
   return new Request(options.url, {
     body: options.body,
@@ -62,17 +63,10 @@ type HttpRequestUrl = {
   port: string | number;
   pathname: string;
   params?: Record<string, string>;
-  query?: URLSearchParams;
+  query: URLSearchParams;
 };
 
-type RequestMiddleware = (req?: Request) => Promise<Request>;
-type ResponseMiddleware = (res?: HttpResponse) => Promise<HttpResponse>;
-type RequestErrorMiddleware = (
-  err?: HttpError<Request>
-) => Promise<HttpError<Request>>;
-type ResponseErrorMiddleware = (
-  err?: HttpError<Response>
-) => Promise<HttpError<Response>>;
+type Middleware<T> = (p: T) => Promise<T> | T;
 
 export enum MiddlewareType {
   RequestSuccess = "RequestSuccess",
@@ -81,115 +75,114 @@ export enum MiddlewareType {
   ResponseError = "ResponseError",
 }
 
+type HttpRequestInit = RequestInit & { url: string };
+
 export class HttpRequest {
   private request: Request;
-  private body: BodyInit | null;
   private url: HttpRequestUrl;
-  private requestMiddleware: RequestMiddleware[] = [];
-  private responseMiddleware: ResponseMiddleware[] = [];
-  private requestErrorMiddleware: RequestErrorMiddleware[] = [];
-  private responseErrorMiddleware: ResponseErrorMiddleware[] = [];
+  private requestMiddleware: Middleware<Request>[] = [];
+  private responseMiddleware: Middleware<HttpResponse>[] = [];
+  private requestErrorMiddleware: Middleware<HttpError<Request>>[] = [];
+  private responseErrorMiddleware: Middleware<HttpError<Response>>[] = [];
 
-  constructor(input?: RequestInfo, init?: RequestInit) {
-    this.request = new Request(input || "", init);
-    this.body = init && init.body ? init.body : null;
-    this.url = {
-      protocol: location.protocol,
-      hostname: location.hostname,
-      port: location.port,
-      pathname: location.pathname,
-    };
-    this.setUrl(this.request.url);
+  constructor(options: RequestInfo | HttpRequestInit | HttpRequest) {
+    if (typeof options === "string") {
+      this.url = getUrlObject(options);
+      this.request = new Request(this.uri);
+    } else if (options instanceof Request) {
+      this.request = new Request(options);
+      this.url = getUrlObject(this.request.url);
+    } else if (options instanceof HttpRequest) {
+      this.request = new Request(options.request);
+      this.url = options.url;
+      this.requestMiddleware = [...options.requestMiddleware];
+      this.responseMiddleware = [...options.responseMiddleware];
+      this.requestErrorMiddleware = [...options.requestErrorMiddleware];
+      this.responseErrorMiddleware = [...options.responseErrorMiddleware];
+    } else {
+      this.url = getUrlObject(options.url);
+      const input: Partial<HttpRequestInit> = { ...options };
+      delete input.url;
+      this.request = new Request(this.uri, input);
+    }
   }
 
   private get uri() {
     const protocol = this.url.protocol.replace(/:$/, "");
     const port = Number(this.url.port) ? ":" + this.url.port : "";
     const pathname = getUrlParamsFormat(this.url.pathname, this.url.params);
-    const query = String(this.url.query) ? "?" + this.url.query : "";
+    const query = String(this.url.query || "") ? "?" + this.url.query : "";
     const path = "/" + pathname.replace(/^\//, "");
     return `${protocol}://${this.url.hostname}${port}${path}${query}`;
   }
 
-  async send<T>(
-    this: HttpRequest,
-    resolve?: (res: HttpResponse) => Promise<T>,
-    reject?: (
-      err: HttpError<Request | Response>
-    ) => Promise<HttpError<Request | Response>>
-  ) {
-    let req = this.request;
-    let res = new HttpResponse(
-      req,
-      new Response(null, { headers: req.headers })
-    );
-    let isResponse = false;
-    try {
-      req = await asyncAction<Request>(this.requestMiddleware, req);
-      const fetchResponse = await fetch(req);
-      isResponse = true;
-      res = new HttpResponse(req, fetchResponse);
-      try {
-        this.fetchHandler(res.response);
-        res = await asyncAction<HttpResponse>(this.responseMiddleware, res);
-        return resolve ? await resolve(res) : res;
-      } catch (info) {
-        throw new Error((info as Error).message);
-      }
-    } catch (info) {
-      const error = info as Error;
-      let result;
-      if (isResponse) {
-        result = await asyncAction<HttpError<Request>>(
-          this.requestErrorMiddleware,
-          new HttpError<Request>(error, res.request)
+  async send() {
+    return new Promise((resolve, reject) => {
+      (async () => {
+        let req = this.request;
+        let res = new HttpResponse(
+          req,
+          new Response(null, { headers: req.headers })
         );
-      } else {
-        result = await asyncAction<HttpError<Response>>(
-          this.responseErrorMiddleware,
-          new HttpError<Response>(error, res.response)
-        );
-      }
-      return reject ? await reject(result) : result;
-    }
-  }
-
-  async fetchHandler(res: Response) {
-    let message = "";
-    function isResult(val: unknown): val is { message: string } {
-      return Boolean(val && typeof val === "object" && "message" in val);
-    }
-    if (!res.ok) {
-      try {
-        const data = await res.json();
-        if (isResult(data)) {
-          message = data.message;
+        let isResponse = false;
+        try {
+          req = await asyncAction<Middleware<Request>>(
+            this.requestMiddleware,
+            req
+          );
+          const fetchResponse = await fetch(req);
+          isResponse = true;
+          res = new HttpResponse(req, fetchResponse);
+          try {
+            res = await asyncAction(this.responseMiddleware, res);
+            await resolve(res);
+          } catch (info) {
+            throw new Error((info as Error).message);
+          }
+        } catch (info) {
+          const error = info as Error;
+          let result;
+          if (isResponse) {
+            result = await asyncAction(
+              this.requestErrorMiddleware,
+              new HttpError<Request>(error, req)
+            );
+          } else {
+            result = await asyncAction(
+              this.responseErrorMiddleware,
+              new HttpError<Response>(error, res)
+            );
+          }
+          reject(result);
         }
-        throw new Error();
-      } catch (error) {
-        message = await res.text();
-      }
-      throw new Error(message);
-    }
+      })();
+    });
   }
 
+  // eslint-disable-next-line prettier/prettier
   middleware(
     type: MiddlewareType.RequestSuccess,
-    ...middleware: RequestMiddleware[]
+    ...middleware: Middleware<Request>[]
   ): HttpRequest;
+  // eslint-disable-next-line prettier/prettier
   middleware(
     type: MiddlewareType.RequestError,
-    ...middleware: RequestMiddleware[]
+    ...middleware: Middleware<HttpError<Request>>[]
   ): HttpRequest;
+  // eslint-disable-next-line prettier/prettier
   middleware(
     type: MiddlewareType.ResponseSuccess,
-    ...middleware: RequestMiddleware[]
+    ...middleware: Middleware<Response>[]
   ): HttpRequest;
+  // eslint-disable-next-line prettier/prettier
   middleware(
     type: MiddlewareType.ResponseError,
-    ...middleware: RequestMiddleware[]
+    ...middleware: Middleware<HttpError<Response>>[]
   ): HttpRequest;
-  middleware(type: MiddlewareType, ...args: any) {
+  middleware<M extends Middleware<any>>(
+    type: MiddlewareType,
+    ...args: M[]
+  ): HttpRequest {
     switch (type) {
       case MiddlewareType.RequestSuccess:
         this.requestMiddleware.push(...args);
@@ -204,11 +197,7 @@ export class HttpRequest {
         this.responseErrorMiddleware.push(...args);
         break;
     }
-    return this;
-  }
-
-  clone() {
-    return this.request.clone();
+    return new HttpRequest(this);
   }
 
   assign(options: RequestInit & { url?: string }) {
@@ -216,9 +205,8 @@ export class HttpRequest {
     this.request = assignRequest(req, {
       ...options,
       url: options.url || req.url,
-      body: this.body,
     });
-    return this;
+    return new HttpRequest(this);
   }
 
   setHeader(
@@ -243,13 +231,28 @@ export class HttpRequest {
             : headers[key];
       });
     }
-    this.assign({ headers: result });
-    return this;
+    return this.assign({ headers: result });
   }
 
   setMethod(method: string) {
-    this.assign({ method });
-    return this;
+    return this.assign({ method: method.toUpperCase() });
+  }
+
+  // eslint-disable-next-line prettier/prettier
+  setBody(
+    body:
+      | ReadableStream<Uint8Array>
+      | Blob
+      | BufferSource
+      | FormData
+      | URLSearchParams
+      | string
+  ) {
+    const method = this.request.method.toUpperCase();
+    if (["GET", "HEAD"].includes(method)) {
+      throw new Error(`[HTTP ERROR]${method} body is not allowed.`);
+    }
+    return this.assign({ body });
   }
 
   setUrl(
@@ -262,28 +265,22 @@ export class HttpRequest {
     if (typeof url === "function") {
       url(this.url);
     } else if (typeof url === "string") {
-      const targetUrl = new URL(url);
-      this.url = {
-        protocol: targetUrl.protocol,
-        hostname: targetUrl.hostname,
-        port: targetUrl.port,
-        pathname: targetUrl.pathname,
-      };
+      this.url = getUrlObject(url);
     } else if (url instanceof URL) {
       this.url = {
-        protocol: url.protocol,
+        protocol: url.protocol.replace(/:$/, ""),
         hostname: url.hostname,
         port: url.port,
         pathname: url.pathname,
+        query: new URLSearchParams(url.search),
       };
     } else {
-      if (url.protocol) this.url.protocol = url.protocol;
+      if (url.protocol) this.url.protocol = url.protocol.replace(/:$/, "");
       if (url.hostname) this.url.hostname = url.hostname;
       if (url.port) this.url.port = url.port;
       if (url.pathname) this.url.pathname = url.pathname;
     }
-    this.assign({ url: this.uri });
-    return this;
+    return this.assign({ url: this.uri });
   }
 
   setQuery(
@@ -295,13 +292,27 @@ export class HttpRequest {
       | undefined
   ) {
     this.url.query = new URLSearchParams(query);
-    return this;
+    return this.assign({ url: this.uri });
+  }
+
+  appendQuery(
+    query?:
+      | string
+      | URLSearchParams
+      | [string, string][]
+      | Record<string, string>
+      | undefined
+  ) {
+    new URLSearchParams(query).forEach((key, value) => {
+      this.url.query.append(key, value);
+    });
+    return this.assign({ url: this.uri });
   }
 
   setParams(params: Record<string, string> | [string, string][]) {
     const result: Record<string, string> = this.url.params || {};
     if (params instanceof Array) {
-      params.forEach(([key, value]) => {
+      params.forEach(([value, key]) => {
         result[key] = value;
       });
     } else {
@@ -313,33 +324,36 @@ export class HttpRequest {
       });
     }
     this.url.params = result;
-    return this;
+    return this.assign({ url: this.uri });
   }
 }
 
-export class HttpResponse<T = unknown> {
+export class HttpResponse extends Response {
   isHttpError = false;
   request: Request;
-  response: Response;
   constructor(req: Request, res: Response) {
+    super(res.body, {
+      headers: res.headers,
+      status: res.status,
+      statusText: res.statusText,
+    });
     this.request = req;
-    this.response = res;
   }
 
-  json(): Promise<T> {
-    return this.response.json();
+  static json<T = unknown>(res: Response): Promise<T> {
+    return res.json();
   }
 
-  text(): Promise<string> {
-    return this.response.text();
+  static blob(res: Response): Promise<Blob> {
+    return res.blob();
   }
 }
 
 export class HttpError<T> extends Error {
   isHttpError = true;
-  http?: T;
+  http: T;
 
-  constructor(error: Error | HttpError<T>, http?: T) {
+  constructor(error: Error | HttpError<T>, http: T) {
     super(error.message);
     this.name = error.name;
     this.stack = error.stack;
@@ -351,6 +365,10 @@ export function isHttpSuccess(
   value: HttpResponse | HttpError<any>
 ): value is HttpResponse {
   return value.isHttpError === false;
+}
+
+export function isHttpError(value: HttpError<any>): value is HttpError<any> {
+  return value.http instanceof HttpError;
 }
 
 export function isHttpRequestError(
