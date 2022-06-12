@@ -1,5 +1,9 @@
-declare type AsyncFunction = (...args: unknown[]) => Promise<unknown>;
-declare function asyncAction(funcs: AsyncFunction[], initData?: unknown): Promise<unknown>;
+import { ParsedPath } from 'path';
+import { RmOptions } from 'fs';
+import { Stream } from 'stream';
+
+declare type AsyncFunction = (...args: any[]) => Promise<any> | any;
+declare function asyncAction<T extends AsyncFunction>(funcs: T[], initData: Parameters<AsyncFunction>[0]): Promise<any>;
 
 interface JsonObject {
     [k: string]: JsonValue;
@@ -15,9 +19,23 @@ declare function cloneJson(obj: unknown): JsonValue;
 declare function stringToJson<T extends string | void>(this: T, param: string): JsonValue;
 declare function jsonToString<T extends Record<string | number | symbol, unknown> | void>(this: T, param: JsonValue): string;
 declare const sleep: (t: number) => Promise<void>;
+declare const optionsOnlyOrList: <T>(param: T | T[], callback: (item: T, index?: number | undefined) => void) => void;
+declare const optionsListOrCollection: <T>(param: {
+    [key: string]: T;
+} | T[], callback: (item: T, index?: string | undefined) => void) => void;
+declare type ConditionString = string | string[] | RegExp | RegExp[] | undefined;
+declare function checkStringIsEvery(value: string, condition: ConditionString): boolean;
+declare function checkStringIsSome(value: string, condition: ConditionString): boolean;
+declare function log(arg: unknown, ...args: unknown[]): unknown;
+
+declare type AnyFunction = (...args: any[]) => any;
+interface ClassConstructor extends Function {
+    new (...args: any[]): any;
+}
 
 declare function isDarkMode(): boolean;
-declare function isClass(value: unknown): value is DateConstructor;
+declare function isClass(value: unknown): value is ClassConstructor;
+declare function isAsyncFunction(value: unknown): value is (...args: any[]) => Promise<any>;
 declare function isArrayEmpty(value: unknown): value is Array<void>;
 declare function isObjectEmpty(value: unknown): boolean;
 declare function isBlobEmpty(value: unknown): boolean;
@@ -26,25 +44,8 @@ declare function isNumberEmpty(value: unknown): boolean;
 declare function isEmpty(value: unknown): boolean;
 declare function isTextIncludes(data: Array<string | RegExp>, text: string): boolean;
 declare function isTextExcludes(data: Array<string | RegExp>, text: string): boolean;
-declare function is<T extends DateConstructor>(val: unknown, type: T): val is T;
+declare function is<T extends ClassConstructor>(val: unknown, type: T): val is T;
 declare function isArrayBufferView(data: unknown): data is ArrayBufferView;
-
-declare function messageFormat(message: string, data: Record<string, string>): string;
-interface HttpErrorOption {
-    message?: string;
-    status?: number;
-    url?: string;
-    method?: string;
-}
-declare class HttpError extends Error {
-    status: number;
-    method: string;
-    url: string;
-    constructor(args?: HttpErrorOption);
-}
-declare function handleErrorLog(error: unknown, data?: Record<string, string>): void;
-declare function handleHttpErrorLog(error: unknown): Error | HttpError;
-declare function handleWarningLog(message: string | string[], data?: Record<string, string>): void;
 
 declare class FileName {
     readonly data: string[];
@@ -72,51 +73,47 @@ interface TreeHelperConfig {
 }
 declare function listToTree<T = any>(list: any[], config?: Partial<TreeHelperConfig>): T[];
 declare function treeToList<T = any>(tree: any, config?: Partial<TreeHelperConfig>): T;
-declare function findNode<T = any>(tree: any, func: Function, config?: Partial<TreeHelperConfig>): T | null;
-declare function findNodeAll<T = any>(tree: any, func: Function, config?: Partial<TreeHelperConfig>): T[];
-declare function findPath<T = any>(tree: any, func: Function, config?: Partial<TreeHelperConfig>): T | T[] | null;
-declare function findPathAll(tree: any, func: Function, config?: Partial<TreeHelperConfig>): any[];
+declare function findNode<T = any>(tree: any, func: AnyFunction, config?: Partial<TreeHelperConfig>): T | null;
+declare function findNodeAll<T = any>(tree: any, func: AnyFunction, config?: Partial<TreeHelperConfig>): T[];
+declare function findPath<T = any>(tree: any, func: AnyFunction, config?: Partial<TreeHelperConfig>): T | T[] | null;
+declare function findPathAll(tree: any, func: AnyFunction, config?: Partial<TreeHelperConfig>): any[];
 declare function filter<T = any>(tree: T[], func: (n: T) => boolean, config?: Partial<TreeHelperConfig>): T[];
-declare function forEach<T = any>(tree: T[], func: (n: T) => any, config?: Partial<TreeHelperConfig>): void;
+declare function forEach<T = any>(tree: T[], func: (n: T) => any, config?: Partial<TreeHelperConfig>): Promise<void>;
 /**
  * @description: Extract tree specified structure
  */
 declare function treeMap<T = any>(treeData: T[], opt: {
     children?: string;
-    conversion: Function;
+    conversion: AnyFunction;
 }): T[];
 /**
  * @description: Extract tree specified structure
  */
-declare function treeMapEach(data: any, { children, conversion }: {
+declare function treeMapEach(data: any, { children, conversion, }: {
     children?: string;
-    conversion: Function;
+    conversion: AnyFunction;
 }): any;
-/**
- * 递归遍历树结构
- * @param treeDatas 树
- * @param callBack 回调
- * @param parentNode 父节点
- */
-declare function eachTree(treeDatas: any[], callBack: Function, parentNode?: {}): void;
+declare function eachElementTree(treeDatas: Array<Element>, callBack: AnyFunction, parentNode?: {}): void;
 
 declare function transformFileSize(value: unknown): number;
+declare function getUrlObject(url: string): {
+    protocol: string;
+    hostname: string;
+    port: string;
+    pathname: string;
+    query: URLSearchParams;
+    hash: string;
+};
 
 declare function uuid(): string;
 declare function uuidDate(prefix?: string): string;
 
-interface ParsedPath {
-    root: string;
-    dir: string;
-    base: string;
-    ext: string;
-    name: string;
-}
-interface IFileModel extends ParsedPath {
+interface IFileModel extends Partial<ParsedPath> {
     url: string;
-    size: number;
-    createTime: Date;
-    updateTime: Date;
+    size?: number;
+    createTime?: Date;
+    updateTime?: Date;
+    data?: Buffer;
 }
 declare class FileModel {
     url: string;
@@ -128,9 +125,14 @@ declare class FileModel {
     size: number;
     createTime: Date;
     updateTime: Date;
+    data: Buffer;
     constructor(args: IFileModel);
+    createFile(): Promise<void> | undefined;
+    readFile(): Promise<Buffer>;
+    renameFile(name: string): Promise<void>;
+    writeFile(data: string | NodeJS.ArrayBufferView | Stream): Promise<void>;
 }
-interface IDirectoryModel extends ParsedPath {
+interface IDirectoryModel extends Partial<ParsedPath> {
     url: string;
     children: Array<FileModel | DirectoryModel>;
 }
@@ -141,11 +143,48 @@ declare class DirectoryModel {
     base: string;
     ext: string;
     name: string;
-    child: Array<FileModel | DirectoryModel>;
+    children: Array<FileModel | DirectoryModel>;
     constructor(args: IDirectoryModel);
+    createFolder(): Promise<void> | undefined;
+    renameFolder(name: string): Promise<void>;
+    removeFile(name: string, options?: RmOptions): Promise<FileModel | DirectoryModel | undefined>;
+    removeFolder(name: string): Promise<FileModel | DirectoryModel | undefined>;
+    eachReadFolder(callback: (n: DirectoryModel | FileModel) => Promise<void>): Promise<void>;
 }
-declare type ReadFileCallback<T> = (url: string, fileData: FileModel | DirectoryModel) => T;
-declare const readDirectory: <T>(dir: string[], filePath: string, callback?: ReadFileCallback<T> | undefined) => Promise<Array<FileModel | DirectoryModel>>;
-declare const readFileTree: <T>(url: string, callback?: ReadFileCallback<T> | undefined) => Promise<FileModel | DirectoryModel>;
+declare type ReadFileCallback = (url: string, fileData: FileModel) => FileModel | void;
+declare type ReadDirCallback = (url: string, fileData: DirectoryModel) => DirectoryModel | void;
+interface ReadFileTreeOptions {
+    readFile?: ReadFileCallback;
+    readDir?: ReadDirCallback;
+    ignore?: string | string[] | RegExp | RegExp[];
+}
+declare const readDirectory: (url: string, options?: Partial<ReadFileTreeOptions> | undefined) => Promise<Array<FileModel | DirectoryModel> | null>;
+declare const readFileTree: (url: string, options?: Partial<ReadFileTreeOptions> | undefined) => Promise<FileModel | DirectoryModel | null>;
 
-export { DirectoryModel, FileModel, FileName, FormDataObject, FormDataValue, HttpError, IDirectoryModel, IFileModel, JsonObject, JsonValue, ReadFileCallback, asyncAction, bufferToString, cloneJson, createFileName, eachTree, filter, findNode, findNodeAll, findPath, findPathAll, forEach, formDataFormat, formUrlEncodedFormat, handleErrorLog, handleHttpErrorLog, handleWarningLog, is, isArrayBufferView, isArrayEmpty, isBlobEmpty, isClass, isDarkMode, isEmpty, isNumberEmpty, isObjectEmpty, isStringEmpty, isTextExcludes, isTextIncludes, jsonToString, listToTree, messageFormat, nameToKebabCase, nameToLowerHumpCase, nameToSnakeCase, nameToUpperHumpCase, readDirectory, readFileTree, sleep, stringToJson, transformFileSize, treeMap, treeMapEach, treeToList, uuid, uuidDate };
+declare enum ConsoleColors {
+    Reset = "\u001B[0m",
+    Bright = "\u001B[1m",
+    Dim = "\u001B[2m",
+    Underscore = "\u001B[4m",
+    Blink = "\u001B[5m",
+    Reverse = "\u001B[7m",
+    Hidden = "\u001B[8m",
+    FgBlack = "\u001B[30m",
+    FgRed = "\u001B[31m",
+    FgGreen = "\u001B[32m",
+    FgYellow = "\u001B[33m",
+    FgBlue = "\u001B[34m",
+    FgMagenta = "\u001B[35m",
+    FgCyan = "\u001B[36m",
+    FgWhite = "\u001B[37m",
+    BgBlack = "\u001B[40m",
+    BgRed = "\u001B[41m",
+    BgGreen = "\u001B[42m",
+    BgYellow = "\u001B[43m",
+    BgBlue = "\u001B[44m",
+    BgMagenta = "\u001B[45m",
+    BgCyan = "\u001B[46m",
+    BgWhite = "\u001B[47m"
+}
+
+export { ConditionString, ConsoleColors, DirectoryModel, FileModel, FileName, FormDataObject, FormDataValue, IDirectoryModel, IFileModel, JsonObject, JsonValue, ReadDirCallback, ReadFileCallback, asyncAction, bufferToString, checkStringIsEvery, checkStringIsSome, cloneJson, createFileName, eachElementTree, filter, findNode, findNodeAll, findPath, findPathAll, forEach, formDataFormat, formUrlEncodedFormat, getUrlObject, is, isArrayBufferView, isArrayEmpty, isAsyncFunction, isBlobEmpty, isClass, isDarkMode, isEmpty, isNumberEmpty, isObjectEmpty, isStringEmpty, isTextExcludes, isTextIncludes, jsonToString, listToTree, log, nameToKebabCase, nameToLowerHumpCase, nameToSnakeCase, nameToUpperHumpCase, optionsListOrCollection, optionsOnlyOrList, readDirectory, readFileTree, sleep, stringToJson, transformFileSize, treeMap, treeMapEach, treeToList, uuid, uuidDate };

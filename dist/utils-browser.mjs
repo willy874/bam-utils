@@ -90,6 +90,60 @@ const sleep = (t) => {
         }, t);
     });
 };
+const optionsOnlyOrList = function (param, callback) {
+    if (Array.isArray(param)) {
+        param.forEach((item, index) => callback(item, index));
+    }
+    else {
+        callback(param);
+    }
+};
+const optionsListOrCollection = function (param, callback) {
+    if (Array.isArray(param)) {
+        param.forEach((item, index) => callback(item, String(index)));
+    }
+    else {
+        Object.keys(param).forEach((key) => callback(param[key], key));
+    }
+};
+function checkStringIsEvery(value, condition) {
+    const bools = [];
+    optionsOnlyOrList(condition, (item) => {
+        if (typeof item === "string") {
+            bools.push(value.includes(item));
+        }
+        else if (item instanceof RegExp) {
+            bools.push(item.test(value));
+        }
+        else {
+            bools.push(false);
+        }
+    });
+    return bools.every(Boolean);
+}
+function checkStringIsSome(value, condition) {
+    const bools = [];
+    optionsOnlyOrList(condition, (item) => {
+        if (typeof item === "string") {
+            bools.push(value.includes(item));
+        }
+        else if (item instanceof RegExp) {
+            bools.push(item.test(value));
+        }
+        else {
+            bools.push(false);
+        }
+    });
+    return bools.some(Boolean);
+}
+function log(arg, ...args) {
+    if (typeof arg === "object" && arg) {
+        console.dir(arg);
+        return arg;
+    }
+    console.log(arg, ...args);
+    return arg;
+}
 
 function isDarkMode() {
     const mediaQuery = matchMedia("(prefers-color-scheme: dark)");
@@ -99,6 +153,9 @@ function isClass(value) {
     return (Object.prototype.toString.call(value) === "[object Function]" &&
         typeof value === "function" &&
         "constructor" in value);
+}
+function isAsyncFunction(value) {
+    return Object.prototype.toString.call(value) === "[object AsyncFunction]";
 }
 function isArrayEmpty(value) {
     return Array.isArray(value) && JSON.stringify(value.filter(Boolean)) === "[]";
@@ -187,51 +244,6 @@ function isArrayBufferView(data) {
     return false;
 }
 
-function messageFormat(message, data) {
-    let logMessage = message;
-    for (const key in data) {
-        const reg = new RegExp('{' + key + '}', 'g');
-        logMessage = logMessage.replace(reg, () => data[key]);
-    }
-    return logMessage;
-}
-class HttpError extends Error {
-    constructor(args = {}) {
-        const message = args.message || '';
-        super(message);
-        this.status = args.status || 0;
-        this.method = args.method?.toUpperCase() || 'GET';
-        this.url = args.url || '';
-    }
-}
-function handleErrorLog(error, data = {}) {
-    if (error instanceof Error) {
-        console.error(messageFormat(error.message, data));
-    }
-    if (typeof error === 'string') {
-        console.error(messageFormat(error, data));
-    }
-}
-function handleHttpErrorLog(error) {
-    if (error instanceof HttpError) {
-        console.error(`%s [%s] %s\n%s`, error.method || 'GET', error.status || 0, error.url || '', error.message);
-        return error;
-    }
-    if (error instanceof Error) {
-        handleErrorLog(error);
-        return error;
-    }
-    return new Error('The function param name of error is not Error().');
-}
-function handleWarningLog(message, data = {}) {
-    if (message instanceof Array) {
-        console.error(...message);
-    }
-    if (typeof message === 'string') {
-        console.warn(messageFormat(message, data));
-    }
-}
-
 class FileName {
     constructor(name) {
         this.data = [];
@@ -311,12 +323,13 @@ function bufferToString(param) {
 }
 
 const DEFAULT_CONFIG = {
-    id: 'id',
-    children: 'children',
-    pid: 'pid',
+    id: "id",
+    children: "children",
+    pid: "pid",
 };
-const getConfig = (config) => Object.assign({}, DEFAULT_CONFIG, config);
-// tree from list
+const getConfig = (config) => {
+    return Object.assign({}, DEFAULT_CONFIG, config);
+};
 function listToTree(list, config = {}) {
     const conf = getConfig(config);
     const nodeMap = new Map();
@@ -422,16 +435,28 @@ function filter(tree, func, config = {}) {
     }
     return listFilter(tree);
 }
-function forEach(tree, func, config = {}) {
+async function forEach(tree, func, config = {}) {
     config = getConfig(config);
     const list = [...tree];
     const { children } = config;
     for (let i = 0; i < list.length; i++) {
-        //func 返回true就终止遍历，避免大量节点场景下无意义循环，引起浏览器卡顿
-        if (func(list[i])) {
-            return;
+        if (isAsyncFunction(func)) {
+            if (await func(list[i])) {
+                return;
+            }
         }
-        children && list[i][children] && list.splice(i + 1, 0, ...list[i][children]);
+        else {
+            const result = func(list[i]);
+            if (result instanceof Promise && (await result)) {
+                return;
+            }
+            else if (result) {
+                return;
+            }
+        }
+        children &&
+            list[i][children] &&
+            list.splice(i + 1, 0, ...list[i][children]);
     }
 }
 /**
@@ -443,7 +468,7 @@ function treeMap(treeData, opt) {
 /**
  * @description: Extract tree specified structure
  */
-function treeMapEach(data, { children = 'children', conversion }) {
+function treeMapEach(data, { children = "children", conversion, }) {
     const haveChildren = Array.isArray(data[children]) && data[children].length > 0;
     const conversionData = conversion(data) || {};
     if (haveChildren) {
@@ -461,17 +486,11 @@ function treeMapEach(data, { children = 'children', conversion }) {
         };
     }
 }
-/**
- * 递归遍历树结构
- * @param treeDatas 树
- * @param callBack 回调
- * @param parentNode 父节点
- */
-function eachTree(treeDatas, callBack, parentNode = {}) {
+function eachElementTree(treeDatas, callBack, parentNode = {}) {
     treeDatas.forEach((element) => {
         const newNode = callBack(element, parentNode) || element;
         if (element.children) {
-            eachTree(element.children, callBack, newNode);
+            eachElementTree(Array.from(element.children), callBack, newNode);
         }
     });
 }
@@ -501,6 +520,24 @@ function transformFileSize(value) {
         return value;
     }
     return NaN;
+}
+function getUrlObject(url) {
+    const [u1, u2] = url.split(/:\/\//);
+    const protocol = u2 ? u1 : "";
+    const [u3, ...u4] = protocol ? u2.split("/") : u1.split("/");
+    const host = protocol ? u3 : "";
+    const u5 = protocol ? [...u4] : [u3, ...u4];
+    const [hostname, port] = host ? host.split(":") : ["", ""];
+    const [pathname, params] = u5.join("/").split("?");
+    const [search, hash] = params ? params.split("#") : ["", ""];
+    return {
+        protocol: protocol || location.protocol.replace(/:$/, ""),
+        hostname: hostname || location.hostname,
+        port: port || location.port || "",
+        pathname,
+        query: new URLSearchParams(search || ""),
+        hash: hash || "",
+    };
 }
 
 const hexList = [];
@@ -533,15 +570,86 @@ function uuidDate(prefix = "") {
     return prefix + "_" + random + unique + String(time);
 }
 
-function isHeaders(data) {
-    return typeof Headers !== "undefined" && data instanceof Headers;
+class StorageManager {
+    constructor(storage) {
+        this.instance = {};
+        this.lifecycle = {};
+        this.storage = storage;
+    }
+    init(data) {
+        if (Array.isArray(data)) {
+            data.forEach((key) => {
+                const value = this.getItem(key);
+                if (value || value === "") {
+                    this.instance[key] = value;
+                }
+            });
+        }
+        else {
+            for (const key in data) {
+                const value = this.getItem(key);
+                if (value || value === "") {
+                    this.instance[key] = value;
+                }
+                else {
+                    this.setItem(key, data[key]);
+                }
+            }
+        }
+        return this;
+    }
+    getInstance() {
+        return Object.assign({}, this.instance);
+    }
+    forEach(callback) {
+        Object.keys(this.instance).forEach((key) => {
+            callback(this.instance[key], key);
+        });
+    }
+    useProxy(getter, setter) {
+        this.getter = getter;
+        this.setter = setter;
+        return this;
+    }
+    getItem(key) {
+        const value = this.storage.getItem(key);
+        if (Date.now() > this.lifecycle[key]) {
+            this.removeItem(key);
+            return null;
+        }
+        return this.getter ? this.getter(value) : value;
+    }
+    setItem(key, value, life) {
+        if (this.setter) {
+            this.instance[key] = this.setter(value);
+        }
+        else {
+            this.instance[key] = value;
+        }
+        if (life) {
+            this.lifecycle[key] = Date.now() + life;
+        }
+        this.storage.setItem(key, this.instance[key]);
+        return this;
+    }
+    extendLifecycle(key, life) {
+        this.lifecycle[key] = this.lifecycle[key] + life;
+        return this;
+    }
+    clear() {
+        this.instance = {};
+        this.lifecycle = {};
+        this.storage.clear();
+        return this;
+    }
+    removeItem(key) {
+        delete this.instance[key];
+        delete this.lifecycle[key];
+        this.storage.removeItem(key);
+        return this;
+    }
 }
-function isRequest(data) {
-    return typeof Request !== "undefined" && data instanceof Request;
-}
-function isResponse(data) {
-    return typeof Response !== "undefined" && data instanceof Response;
-}
+
 function isBrowserSupported(key) {
     return typeof Window !== "undefined" && key in window;
 }
@@ -745,7 +853,7 @@ async function imageValidator(value, option) {
         if (opt.size) {
             const sizeNumber = transformFileSize(opt.size);
             if (isNaN(sizeNumber)) {
-                handleWarningLog("utils[function validImage]: The option property size is not valid variable.");
+                console.warn("utils[function validImage]: The option property size is not valid variable.");
             }
             else {
                 if (value.size > sizeNumber) {
@@ -765,7 +873,7 @@ async function imageValidator(value, option) {
         }
     }
     else {
-        handleWarningLog("utils[function validImage]: The value is not Blob object.");
+        console.warn("utils[function validImage]: The value is not Blob object.");
     }
     return errors.length ? errors : null;
 }
@@ -786,11 +894,11 @@ class Validator {
     }
     async validate(options) {
         if (isEmpty(this.model)) {
-            handleWarningLog("utils[function validate]: The form property is all empty.");
+            console.warn("utils[function validate]: The form property is all empty.");
         }
         const opt = options || this.validateOption;
         if (isEmpty(opt)) {
-            handleWarningLog("utils[function validate]: The options property is all empty.");
+            console.warn("utils[function validate]: The options property is all empty.");
         }
         const errors = {};
         if (opt) {
@@ -824,7 +932,7 @@ class Validator {
             }
         }
         else {
-            handleWarningLog("utils[function validateField]: The options type is not a ValidateField.");
+            console.warn("utils[function validateField]: The options type is not a ValidateField.");
         }
         const result = errors.filter((s) => s);
         return result.length ? result : null;
@@ -912,4 +1020,4 @@ function getTransformStyleString(transform) {
   `;
 }
 
-export { FileName, HttpError, Validator, asyncAction, base64toBlob, blobToBase64, bufferToString, clearDragImage, cloneJson, createFileName, eachTree, filter, findNode, findNodeAll, findPath, findPathAll, forEach, formDataFormat, formUrlEncodedFormat, getBoundingClientRect, getTransformStyleString, getViewportOffset, handleErrorLog, handleHttpErrorLog, handleWarningLog, imageToBase64, is, isArrayBufferView, isArrayEmpty, isBlobEmpty, isBrowserSupported, isClass, isDarkMode, isEmpty, isHeaders, isNumberEmpty, isObjectEmpty, isRequest, isResponse, isStringEmpty, isTextExcludes, isTextIncludes, jsonToString, listToTree, messageFormat, nameToKebabCase, nameToLowerHumpCase, nameToSnakeCase, nameToUpperHumpCase, sleep, stringToJson, transformFileSize, treeMap, treeMapEach, treeToList, urlToImageElement, uuid, uuidDate };
+export { FileName, StorageManager, Validator, asyncAction, base64toBlob, blobToBase64, bufferToString, checkStringIsEvery, checkStringIsSome, clearDragImage, cloneJson, createFileName, eachElementTree, filter, findNode, findNodeAll, findPath, findPathAll, forEach, formDataFormat, formUrlEncodedFormat, getBoundingClientRect, getTransformStyleString, getUrlObject, getViewportOffset, imageToBase64, is, isArrayBufferView, isArrayEmpty, isAsyncFunction, isBlobEmpty, isBrowserSupported, isClass, isDarkMode, isEmpty, isNumberEmpty, isObjectEmpty, isStringEmpty, isTextExcludes, isTextIncludes, jsonToString, listToTree, log, nameToKebabCase, nameToLowerHumpCase, nameToSnakeCase, nameToUpperHumpCase, optionsListOrCollection, optionsOnlyOrList, sleep, stringToJson, transformFileSize, treeMap, treeMapEach, treeToList, urlToImageElement, uuid, uuidDate };

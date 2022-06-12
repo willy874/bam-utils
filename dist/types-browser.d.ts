@@ -1,5 +1,5 @@
-declare type AsyncFunction = (...args: unknown[]) => Promise<unknown>;
-declare function asyncAction(funcs: AsyncFunction[], initData?: unknown): Promise<unknown>;
+declare type AsyncFunction = (...args: any[]) => Promise<any> | any;
+declare function asyncAction<T extends AsyncFunction>(funcs: T[], initData: Parameters<AsyncFunction>[0]): Promise<any>;
 
 interface JsonObject {
     [k: string]: JsonValue;
@@ -15,9 +15,23 @@ declare function cloneJson(obj: unknown): JsonValue;
 declare function stringToJson<T extends string | void>(this: T, param: string): JsonValue;
 declare function jsonToString<T extends Record<string | number | symbol, unknown> | void>(this: T, param: JsonValue): string;
 declare const sleep: (t: number) => Promise<void>;
+declare const optionsOnlyOrList: <T>(param: T | T[], callback: (item: T, index?: number | undefined) => void) => void;
+declare const optionsListOrCollection: <T>(param: {
+    [key: string]: T;
+} | T[], callback: (item: T, index?: string | undefined) => void) => void;
+declare type ConditionString = string | string[] | RegExp | RegExp[] | undefined;
+declare function checkStringIsEvery(value: string, condition: ConditionString): boolean;
+declare function checkStringIsSome(value: string, condition: ConditionString): boolean;
+declare function log(arg: unknown, ...args: unknown[]): unknown;
+
+declare type AnyFunction = (...args: any[]) => any;
+interface ClassConstructor extends Function {
+    new (...args: any[]): any;
+}
 
 declare function isDarkMode(): boolean;
-declare function isClass(value: unknown): value is DateConstructor;
+declare function isClass(value: unknown): value is ClassConstructor;
+declare function isAsyncFunction(value: unknown): value is (...args: any[]) => Promise<any>;
 declare function isArrayEmpty(value: unknown): value is Array<void>;
 declare function isObjectEmpty(value: unknown): boolean;
 declare function isBlobEmpty(value: unknown): boolean;
@@ -26,25 +40,8 @@ declare function isNumberEmpty(value: unknown): boolean;
 declare function isEmpty(value: unknown): boolean;
 declare function isTextIncludes(data: Array<string | RegExp>, text: string): boolean;
 declare function isTextExcludes(data: Array<string | RegExp>, text: string): boolean;
-declare function is<T extends DateConstructor>(val: unknown, type: T): val is T;
+declare function is<T extends ClassConstructor>(val: unknown, type: T): val is T;
 declare function isArrayBufferView(data: unknown): data is ArrayBufferView;
-
-declare function messageFormat(message: string, data: Record<string, string>): string;
-interface HttpErrorOption {
-    message?: string;
-    status?: number;
-    url?: string;
-    method?: string;
-}
-declare class HttpError extends Error {
-    status: number;
-    method: string;
-    url: string;
-    constructor(args?: HttpErrorOption);
-}
-declare function handleErrorLog(error: unknown, data?: Record<string, string>): void;
-declare function handleHttpErrorLog(error: unknown): Error | HttpError;
-declare function handleWarningLog(message: string | string[], data?: Record<string, string>): void;
 
 declare class FileName {
     readonly data: string[];
@@ -72,42 +69,61 @@ interface TreeHelperConfig {
 }
 declare function listToTree<T = any>(list: any[], config?: Partial<TreeHelperConfig>): T[];
 declare function treeToList<T = any>(tree: any, config?: Partial<TreeHelperConfig>): T;
-declare function findNode<T = any>(tree: any, func: Function, config?: Partial<TreeHelperConfig>): T | null;
-declare function findNodeAll<T = any>(tree: any, func: Function, config?: Partial<TreeHelperConfig>): T[];
-declare function findPath<T = any>(tree: any, func: Function, config?: Partial<TreeHelperConfig>): T | T[] | null;
-declare function findPathAll(tree: any, func: Function, config?: Partial<TreeHelperConfig>): any[];
+declare function findNode<T = any>(tree: any, func: AnyFunction, config?: Partial<TreeHelperConfig>): T | null;
+declare function findNodeAll<T = any>(tree: any, func: AnyFunction, config?: Partial<TreeHelperConfig>): T[];
+declare function findPath<T = any>(tree: any, func: AnyFunction, config?: Partial<TreeHelperConfig>): T | T[] | null;
+declare function findPathAll(tree: any, func: AnyFunction, config?: Partial<TreeHelperConfig>): any[];
 declare function filter<T = any>(tree: T[], func: (n: T) => boolean, config?: Partial<TreeHelperConfig>): T[];
-declare function forEach<T = any>(tree: T[], func: (n: T) => any, config?: Partial<TreeHelperConfig>): void;
+declare function forEach<T = any>(tree: T[], func: (n: T) => any, config?: Partial<TreeHelperConfig>): Promise<void>;
 /**
  * @description: Extract tree specified structure
  */
 declare function treeMap<T = any>(treeData: T[], opt: {
     children?: string;
-    conversion: Function;
+    conversion: AnyFunction;
 }): T[];
 /**
  * @description: Extract tree specified structure
  */
-declare function treeMapEach(data: any, { children, conversion }: {
+declare function treeMapEach(data: any, { children, conversion, }: {
     children?: string;
-    conversion: Function;
+    conversion: AnyFunction;
 }): any;
-/**
- * 递归遍历树结构
- * @param treeDatas 树
- * @param callBack 回调
- * @param parentNode 父节点
- */
-declare function eachTree(treeDatas: any[], callBack: Function, parentNode?: {}): void;
+declare function eachElementTree(treeDatas: Array<Element>, callBack: AnyFunction, parentNode?: {}): void;
 
 declare function transformFileSize(value: unknown): number;
+declare function getUrlObject(url: string): {
+    protocol: string;
+    hostname: string;
+    port: string;
+    pathname: string;
+    query: URLSearchParams;
+    hash: string;
+};
 
 declare function uuid(): string;
 declare function uuidDate(prefix?: string): string;
 
-declare function isHeaders(data: unknown): data is Headers;
-declare function isRequest(data: unknown): data is Request;
-declare function isResponse(data: unknown): data is Response;
+declare type StorageGetter = (value: string | null) => string;
+declare type StorageSetter = (value: string) => string;
+declare class StorageManager {
+    private readonly storage;
+    private instance;
+    private lifecycle;
+    private getter?;
+    private setter?;
+    constructor(storage: Storage);
+    init(data: string[] | Record<string, string>): this;
+    getInstance(): Record<string, string>;
+    forEach(callback: (value: string, key: string) => void): void;
+    useProxy(getter: StorageGetter, setter: StorageSetter): this;
+    getItem(key: string): string | null;
+    setItem(key: string, value: string, life?: number): this;
+    extendLifecycle(key: string, life: number): this;
+    clear(): this;
+    removeItem(key: string): this;
+}
+
 declare function isBrowserSupported(key: string): boolean;
 declare function urlToImageElement(url: string): Promise<HTMLImageElement>;
 declare function imageToBase64(img: HTMLImageElement | HTMLVideoElement | HTMLCanvasElement | ImageBitmap, type?: string): string;
@@ -184,4 +200,4 @@ interface TransformStyle {
 }
 declare function getTransformStyleString(transform: TransformStyle): string;
 
-export { FileName, FormDataObject, FormDataValue, HttpError, JsonObject, JsonValue, TransformStyle, ValidateField, ValidateOption, Validator, ValidatorHandler, ValidatorHandlerOption, ValidatorValidOption, ViewportOffsetResult, asyncAction, base64toBlob, blobToBase64, bufferToString, clearDragImage, cloneJson, createFileName, eachTree, filter, findNode, findNodeAll, findPath, findPathAll, forEach, formDataFormat, formUrlEncodedFormat, getBoundingClientRect, getTransformStyleString, getViewportOffset, handleErrorLog, handleHttpErrorLog, handleWarningLog, imageToBase64, is, isArrayBufferView, isArrayEmpty, isBlobEmpty, isBrowserSupported, isClass, isDarkMode, isEmpty, isHeaders, isNumberEmpty, isObjectEmpty, isRequest, isResponse, isStringEmpty, isTextExcludes, isTextIncludes, jsonToString, listToTree, messageFormat, nameToKebabCase, nameToLowerHumpCase, nameToSnakeCase, nameToUpperHumpCase, sleep, stringToJson, transformFileSize, treeMap, treeMapEach, treeToList, urlToImageElement, uuid, uuidDate };
+export { ConditionString, FileName, FormDataObject, FormDataValue, JsonObject, JsonValue, StorageGetter, StorageManager, StorageSetter, TransformStyle, ValidateField, ValidateOption, Validator, ValidatorHandler, ValidatorHandlerOption, ValidatorValidOption, ViewportOffsetResult, asyncAction, base64toBlob, blobToBase64, bufferToString, checkStringIsEvery, checkStringIsSome, clearDragImage, cloneJson, createFileName, eachElementTree, filter, findNode, findNodeAll, findPath, findPathAll, forEach, formDataFormat, formUrlEncodedFormat, getBoundingClientRect, getTransformStyleString, getUrlObject, getViewportOffset, imageToBase64, is, isArrayBufferView, isArrayEmpty, isAsyncFunction, isBlobEmpty, isBrowserSupported, isClass, isDarkMode, isEmpty, isNumberEmpty, isObjectEmpty, isStringEmpty, isTextExcludes, isTextIncludes, jsonToString, listToTree, log, nameToKebabCase, nameToLowerHumpCase, nameToSnakeCase, nameToUpperHumpCase, optionsListOrCollection, optionsOnlyOrList, sleep, stringToJson, transformFileSize, treeMap, treeMapEach, treeToList, urlToImageElement, uuid, uuidDate };

@@ -1,5 +1,4 @@
 import { isEmpty, isTextIncludes } from "./condition";
-import { handleWarningLog } from "./error";
 import { urlToImageElement, blobToBase64 } from "./browser";
 import { transformFileSize } from "./transform";
 
@@ -199,7 +198,7 @@ async function imageValidator(
     if (opt.size) {
       const sizeNumber = transformFileSize(opt.size);
       if (isNaN(sizeNumber)) {
-        handleWarningLog(
+        console.warn(
           "utils[function validImage]: The option property size is not valid variable."
         );
       } else {
@@ -224,9 +223,7 @@ async function imageValidator(
       }
     }
   } else {
-    handleWarningLog(
-      "utils[function validImage]: The value is not Blob object."
-    );
+    console.warn("utils[function validImage]: The value is not Blob object.");
   }
   return errors.length ? errors : null;
 }
@@ -284,13 +281,11 @@ export class Validator<M> {
     options?: ValidatorValidOption<M, ValidatorHandlerList>
   ): Promise<ErrorMessages> {
     if (isEmpty(this.model)) {
-      handleWarningLog(
-        "utils[function validate]: The form property is all empty."
-      );
+      console.warn("utils[function validate]: The form property is all empty.");
     }
     const opt = options || this.validateOption;
     if (isEmpty(opt)) {
-      handleWarningLog(
+      console.warn(
         "utils[function validate]: The options property is all empty."
       );
     }
@@ -332,7 +327,7 @@ export class Validator<M> {
         }
       }
     } else {
-      handleWarningLog(
+      console.warn(
         "utils[function validateField]: The options type is not a ValidateField."
       );
     }

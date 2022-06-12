@@ -102,6 +102,60 @@ const sleep = (t) => {
         }, t);
     });
 };
+const optionsOnlyOrList = function (param, callback) {
+    if (Array.isArray(param)) {
+        param.forEach((item, index) => callback(item, index));
+    }
+    else {
+        callback(param);
+    }
+};
+const optionsListOrCollection = function (param, callback) {
+    if (Array.isArray(param)) {
+        param.forEach((item, index) => callback(item, String(index)));
+    }
+    else {
+        Object.keys(param).forEach((key) => callback(param[key], key));
+    }
+};
+function checkStringIsEvery(value, condition) {
+    const bools = [];
+    optionsOnlyOrList(condition, (item) => {
+        if (typeof item === "string") {
+            bools.push(value.includes(item));
+        }
+        else if (item instanceof RegExp) {
+            bools.push(item.test(value));
+        }
+        else {
+            bools.push(false);
+        }
+    });
+    return bools.every(Boolean);
+}
+function checkStringIsSome(value, condition) {
+    const bools = [];
+    optionsOnlyOrList(condition, (item) => {
+        if (typeof item === "string") {
+            bools.push(value.includes(item));
+        }
+        else if (item instanceof RegExp) {
+            bools.push(item.test(value));
+        }
+        else {
+            bools.push(false);
+        }
+    });
+    return bools.some(Boolean);
+}
+function log(arg, ...args) {
+    if (typeof arg === "object" && arg) {
+        console.dir(arg);
+        return arg;
+    }
+    console.log(arg, ...args);
+    return arg;
+}
 
 function isDarkMode() {
     const mediaQuery = matchMedia("(prefers-color-scheme: dark)");
@@ -111,6 +165,9 @@ function isClass(value) {
     return (Object.prototype.toString.call(value) === "[object Function]" &&
         typeof value === "function" &&
         "constructor" in value);
+}
+function isAsyncFunction(value) {
+    return Object.prototype.toString.call(value) === "[object AsyncFunction]";
 }
 function isArrayEmpty(value) {
     return Array.isArray(value) && JSON.stringify(value.filter(Boolean)) === "[]";
@@ -199,51 +256,6 @@ function isArrayBufferView(data) {
     return false;
 }
 
-function messageFormat(message, data) {
-    let logMessage = message;
-    for (const key in data) {
-        const reg = new RegExp('{' + key + '}', 'g');
-        logMessage = logMessage.replace(reg, () => data[key]);
-    }
-    return logMessage;
-}
-class HttpError extends Error {
-    constructor(args = {}) {
-        const message = args.message || '';
-        super(message);
-        this.status = args.status || 0;
-        this.method = args.method?.toUpperCase() || 'GET';
-        this.url = args.url || '';
-    }
-}
-function handleErrorLog(error, data = {}) {
-    if (error instanceof Error) {
-        console.error(messageFormat(error.message, data));
-    }
-    if (typeof error === 'string') {
-        console.error(messageFormat(error, data));
-    }
-}
-function handleHttpErrorLog(error) {
-    if (error instanceof HttpError) {
-        console.error(`%s [%s] %s\n%s`, error.method || 'GET', error.status || 0, error.url || '', error.message);
-        return error;
-    }
-    if (error instanceof Error) {
-        handleErrorLog(error);
-        return error;
-    }
-    return new Error('The function param name of error is not Error().');
-}
-function handleWarningLog(message, data = {}) {
-    if (message instanceof Array) {
-        console.error(...message);
-    }
-    if (typeof message === 'string') {
-        console.warn(messageFormat(message, data));
-    }
-}
-
 class FileName {
     constructor(name) {
         this.data = [];
@@ -323,12 +335,13 @@ function bufferToString(param) {
 }
 
 const DEFAULT_CONFIG = {
-    id: 'id',
-    children: 'children',
-    pid: 'pid',
+    id: "id",
+    children: "children",
+    pid: "pid",
 };
-const getConfig = (config) => Object.assign({}, DEFAULT_CONFIG, config);
-// tree from list
+const getConfig = (config) => {
+    return Object.assign({}, DEFAULT_CONFIG, config);
+};
 function listToTree(list, config = {}) {
     const conf = getConfig(config);
     const nodeMap = new Map();
@@ -434,16 +447,28 @@ function filter(tree, func, config = {}) {
     }
     return listFilter(tree);
 }
-function forEach(tree, func, config = {}) {
+async function forEach(tree, func, config = {}) {
     config = getConfig(config);
     const list = [...tree];
     const { children } = config;
     for (let i = 0; i < list.length; i++) {
-        //func 返回true就终止遍历，避免大量节点场景下无意义循环，引起浏览器卡顿
-        if (func(list[i])) {
-            return;
+        if (isAsyncFunction(func)) {
+            if (await func(list[i])) {
+                return;
+            }
         }
-        children && list[i][children] && list.splice(i + 1, 0, ...list[i][children]);
+        else {
+            const result = func(list[i]);
+            if (result instanceof Promise && (await result)) {
+                return;
+            }
+            else if (result) {
+                return;
+            }
+        }
+        children &&
+            list[i][children] &&
+            list.splice(i + 1, 0, ...list[i][children]);
     }
 }
 /**
@@ -455,7 +480,7 @@ function treeMap(treeData, opt) {
 /**
  * @description: Extract tree specified structure
  */
-function treeMapEach(data, { children = 'children', conversion }) {
+function treeMapEach(data, { children = "children", conversion, }) {
     const haveChildren = Array.isArray(data[children]) && data[children].length > 0;
     const conversionData = conversion(data) || {};
     if (haveChildren) {
@@ -473,17 +498,11 @@ function treeMapEach(data, { children = 'children', conversion }) {
         };
     }
 }
-/**
- * 递归遍历树结构
- * @param treeDatas 树
- * @param callBack 回调
- * @param parentNode 父节点
- */
-function eachTree(treeDatas, callBack, parentNode = {}) {
+function eachElementTree(treeDatas, callBack, parentNode = {}) {
     treeDatas.forEach((element) => {
         const newNode = callBack(element, parentNode) || element;
         if (element.children) {
-            eachTree(element.children, callBack, newNode);
+            eachElementTree(Array.from(element.children), callBack, newNode);
         }
     });
 }
@@ -513,6 +532,24 @@ function transformFileSize(value) {
         return value;
     }
     return NaN;
+}
+function getUrlObject(url) {
+    const [u1, u2] = url.split(/:\/\//);
+    const protocol = u2 ? u1 : "";
+    const [u3, ...u4] = protocol ? u2.split("/") : u1.split("/");
+    const host = protocol ? u3 : "";
+    const u5 = protocol ? [...u4] : [u3, ...u4];
+    const [hostname, port] = host ? host.split(":") : ["", ""];
+    const [pathname, params] = u5.join("/").split("?");
+    const [search, hash] = params ? params.split("#") : ["", ""];
+    return {
+        protocol: protocol || location.protocol.replace(/:$/, ""),
+        hostname: hostname || location.hostname,
+        port: port || location.port || "",
+        pathname,
+        query: new URLSearchParams(search || ""),
+        hash: hash || "",
+    };
 }
 
 const hexList = [];
@@ -545,34 +582,131 @@ function uuidDate(prefix = "") {
     return prefix + "_" + random + unique + String(time);
 }
 
+const isFileNotEmpty = function (file) {
+    return is(file, FileModel) || is(file, DirectoryModel);
+};
 class FileModel {
     constructor(args) {
         this.url = args.url;
-        this.root = args.root;
-        this.base = args.base;
-        this.name = args.name;
-        this.ext = args.ext;
-        this.dir = args.ext;
-        this.size = args.size;
-        this.createTime = args.createTime;
-        this.updateTime = args.updateTime;
+        const parsedPath = path__default["default"].parse(args.url);
+        this.root = args.root || parsedPath.root;
+        this.base = args.base || parsedPath.base;
+        this.name = args.name || parsedPath.name;
+        this.ext = args.ext || parsedPath.ext;
+        this.dir = args.dir || parsedPath.dir;
+        this.size = args.size || 0;
+        this.createTime = args.createTime || new Date();
+        this.updateTime = args.updateTime || new Date();
+        this.data = args.data || Buffer.from("");
+    }
+    createFile() {
+        try {
+            return fs__default["default"].promises.writeFile(this.url, this.data);
+        }
+        catch (error) {
+            console.error(error);
+        }
+    }
+    async readFile() {
+        try {
+            this.data = await fs__default["default"].promises.readFile(this.url);
+        }
+        catch (error) {
+            console.error(error);
+        }
+        return this.data;
+    }
+    async renameFile(name) {
+        try {
+            await fs__default["default"].promises.rename(this.url, this.dir + name);
+            this.name = name;
+        }
+        catch (error) {
+            console.error(error);
+        }
+    }
+    async writeFile(data) {
+        try {
+            await fs__default["default"].promises.writeFile(this.url, data);
+            this.data = await fs__default["default"].promises.readFile(this.url);
+        }
+        catch (error) {
+            console.error(error);
+        }
     }
 }
 class DirectoryModel {
     constructor(args) {
         this.url = args.url;
-        this.root = args.root;
-        this.base = args.base;
-        this.name = args.name;
-        this.ext = args.ext;
-        this.dir = args.ext;
-        this.child = args.children;
+        const parsedPath = path__default["default"].parse(args.url);
+        this.root = args.root || parsedPath.root;
+        this.base = args.base || parsedPath.base;
+        this.name = args.name || parsedPath.name;
+        this.ext = args.ext || parsedPath.ext;
+        this.dir = args.dir || parsedPath.dir;
+        this.children = args.children ? [...args.children] : [];
+    }
+    createFolder() {
+        try {
+            return fs__default["default"].promises.mkdir(this.url);
+        }
+        catch (error) {
+            console.error(error);
+        }
+    }
+    async renameFolder(name) {
+        try {
+            await fs__default["default"].promises.rename(this.url, path__default["default"].join(this.dir, name));
+            this.name = name;
+        }
+        catch (error) {
+            console.error(error);
+        }
+    }
+    async removeFile(name, options) {
+        try {
+            const url = path__default["default"].join(this.dir, name);
+            await fs__default["default"].promises.rm(url, options);
+            const index = this.children.map((f) => f.url).indexOf(url);
+            return this.children.splice(index, 1)[0];
+        }
+        catch (error) {
+            console.error(error);
+        }
+    }
+    async removeFolder(name) {
+        try {
+            const url = path__default["default"].join(this.dir, name);
+            await fs__default["default"].promises.mkdir(path__default["default"].join(this.dir, name), { recursive: true });
+            const index = this.children.map((f) => f.url).indexOf(url);
+            return this.children.splice(index, 1)[0];
+        }
+        catch (error) {
+            console.error(error);
+        }
+    }
+    eachReadFolder(callback) {
+        return forEach(this.children, callback);
     }
 }
-const readDirectory = async function (dir, filePath, callback) {
-    return await Promise.all(dir.map((file) => readFileTree(path__default["default"].join(filePath, file), callback)));
+const readDirectory = async function (url, options) {
+    const dir = await fs__default["default"].promises.readdir(url);
+    if (!fs__default["default"].existsSync(url)) {
+        console.error(`There are no files for "${url}".`);
+        return null;
+    }
+    const dirData = await Promise.all(dir.map((file) => readFileTree(path__default["default"].join(url, file), options)));
+    return dirData.filter(isFileNotEmpty);
 };
-const readFileTree = async function (url, callback) {
+const readFileTree = async function (url, options) {
+    const { readFile, readDir, ignore } = options || {};
+    if (checkStringIsSome(url, ignore)) {
+        return null;
+    }
+    if (!fs__default["default"].existsSync(url)) {
+        console.error(`There are no files for "${url}".`);
+        return null;
+    }
     const ParsedPath = path__default["default"].parse(url);
     const stat = await fs__default["default"].promises.stat(url);
     if (stat.isFile()) {
@@ -583,29 +717,66 @@ const readFileTree = async function (url, callback) {
             createTime: stat.birthtime,
             updateTime: stat.mtime,
         });
-        if (callback)
-            await callback(url, fileData);
+        if (readFile) {
+            const result = await readFile(url, fileData);
+            if (result instanceof FileModel)
+                return result;
+        }
         return fileData;
     }
     else {
-        const dir = await fs__default["default"].promises.readdir(url);
-        const children = await readDirectory(dir, url, callback);
-        const dirData = new DirectoryModel({ url, ...ParsedPath, children });
-        if (callback)
-            await callback(url, dirData);
+        const children = await readDirectory(url, options);
+        const dirData = new DirectoryModel({
+            url,
+            ...ParsedPath,
+            children: children || [],
+        });
+        if (readDir) {
+            const result = await readDir(url, dirData);
+            if (result instanceof DirectoryModel)
+                return result;
+        }
         return dirData;
     }
 };
 
+exports.ConsoleColors = void 0;
+(function (ConsoleColors) {
+    ConsoleColors["Reset"] = "\u001B[0m";
+    ConsoleColors["Bright"] = "\u001B[1m";
+    ConsoleColors["Dim"] = "\u001B[2m";
+    ConsoleColors["Underscore"] = "\u001B[4m";
+    ConsoleColors["Blink"] = "\u001B[5m";
+    ConsoleColors["Reverse"] = "\u001B[7m";
+    ConsoleColors["Hidden"] = "\u001B[8m";
+    ConsoleColors["FgBlack"] = "\u001B[30m";
+    ConsoleColors["FgRed"] = "\u001B[31m";
+    ConsoleColors["FgGreen"] = "\u001B[32m";
+    ConsoleColors["FgYellow"] = "\u001B[33m";
+    ConsoleColors["FgBlue"] = "\u001B[34m";
+    ConsoleColors["FgMagenta"] = "\u001B[35m";
+    ConsoleColors["FgCyan"] = "\u001B[36m";
+    ConsoleColors["FgWhite"] = "\u001B[37m";
+    ConsoleColors["BgBlack"] = "\u001B[40m";
+    ConsoleColors["BgRed"] = "\u001B[41m";
+    ConsoleColors["BgGreen"] = "\u001B[42m";
+    ConsoleColors["BgYellow"] = "\u001B[43m";
+    ConsoleColors["BgBlue"] = "\u001B[44m";
+    ConsoleColors["BgMagenta"] = "\u001B[45m";
+    ConsoleColors["BgCyan"] = "\u001B[46m";
+    ConsoleColors["BgWhite"] = "\u001B[47m";
+})(exports.ConsoleColors || (exports.ConsoleColors = {}));
+
 exports.DirectoryModel = DirectoryModel;
 exports.FileModel = FileModel;
 exports.FileName = FileName;
-exports.HttpError = HttpError;
 exports.asyncAction = asyncAction;
 exports.bufferToString = bufferToString;
+exports.checkStringIsEvery = checkStringIsEvery;
+exports.checkStringIsSome = checkStringIsSome;
 exports.cloneJson = cloneJson;
 exports.createFileName = createFileName;
-exports.eachTree = eachTree;
+exports.eachElementTree = eachElementTree;
 exports.filter = filter;
 exports.findNode = findNode;
 exports.findNodeAll = findNodeAll;
@@ -614,12 +785,11 @@ exports.findPathAll = findPathAll;
 exports.forEach = forEach;
 exports.formDataFormat = formDataFormat;
 exports.formUrlEncodedFormat = formUrlEncodedFormat;
-exports.handleErrorLog = handleErrorLog;
-exports.handleHttpErrorLog = handleHttpErrorLog;
-exports.handleWarningLog = handleWarningLog;
+exports.getUrlObject = getUrlObject;
 exports.is = is;
 exports.isArrayBufferView = isArrayBufferView;
 exports.isArrayEmpty = isArrayEmpty;
+exports.isAsyncFunction = isAsyncFunction;
 exports.isBlobEmpty = isBlobEmpty;
 exports.isClass = isClass;
 exports.isDarkMode = isDarkMode;
@@ -631,11 +801,13 @@ exports.isTextExcludes = isTextExcludes;
 exports.isTextIncludes = isTextIncludes;
 exports.jsonToString = jsonToString;
 exports.listToTree = listToTree;
-exports.messageFormat = messageFormat;
+exports.log = log;
 exports.nameToKebabCase = nameToKebabCase;
 exports.nameToLowerHumpCase = nameToLowerHumpCase;
 exports.nameToSnakeCase = nameToSnakeCase;
 exports.nameToUpperHumpCase = nameToUpperHumpCase;
+exports.optionsListOrCollection = optionsListOrCollection;
+exports.optionsOnlyOrList = optionsOnlyOrList;
 exports.readDirectory = readDirectory;
 exports.readFileTree = readFileTree;
 exports.sleep = sleep;
