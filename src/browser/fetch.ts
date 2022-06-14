@@ -82,8 +82,8 @@ export class HttpRequest {
   private url: HttpRequestUrl;
   private requestMiddleware: Middleware<Request>[] = [];
   private responseMiddleware: Middleware<HttpResponse>[] = [];
-  private requestErrorMiddleware: Middleware<HttpError<Request>>[] = [];
-  private responseErrorMiddleware: Middleware<HttpError<Response>>[] = [];
+  private requestErrorMiddleware: Middleware<HttpError>[] = [];
+  private responseErrorMiddleware: Middleware<HttpError>[] = [];
 
   constructor(options: RequestInfo | HttpRequestInit | HttpRequest) {
     if (typeof options === "string") {
@@ -145,12 +145,12 @@ export class HttpRequest {
           if (isResponse) {
             result = await asyncAction(
               this.requestErrorMiddleware,
-              new HttpError<Request>(error, req)
+              new HttpError(error, req)
             );
           } else {
             result = await asyncAction(
               this.responseErrorMiddleware,
-              new HttpError<Response>(error, res)
+              new HttpError(error, req, res)
             );
           }
           reject(result);
@@ -167,7 +167,7 @@ export class HttpRequest {
   // eslint-disable-next-line prettier/prettier
   middleware(
     type: MiddlewareType.RequestError,
-    ...middleware: Middleware<HttpError<Request>>[]
+    ...middleware: Middleware<HttpError>[]
   ): HttpRequest;
   // eslint-disable-next-line prettier/prettier
   middleware(
@@ -177,7 +177,7 @@ export class HttpRequest {
   // eslint-disable-next-line prettier/prettier
   middleware(
     type: MiddlewareType.ResponseError,
-    ...middleware: Middleware<HttpError<Response>>[]
+    ...middleware: Middleware<HttpError>[]
   ): HttpRequest;
   middleware<M extends Middleware<any>>(
     type: MiddlewareType,
@@ -209,6 +209,27 @@ export class HttpRequest {
     return new HttpRequest(this);
   }
 
+  setMethod(method: string) {
+    return this.assign({ method: method.toUpperCase() });
+  }
+
+  // eslint-disable-next-line prettier/prettier
+  setBody(
+    body:
+      | ReadableStream<Uint8Array>
+      | Blob
+      | BufferSource
+      | FormData
+      | URLSearchParams
+      | string
+  ) {
+    const method = this.request.method.toUpperCase();
+    if (["GET", "HEAD"].includes(method)) {
+      throw new Error(`[HTTP ERROR]${method} body is not allowed.`);
+    }
+    return this.assign({ body });
+  }
+
   setHeader(
     headers: HeadersInit | Record<string, any> | ((h: Headers) => void)
   ) {
@@ -232,27 +253,6 @@ export class HttpRequest {
       });
     }
     return this.assign({ headers: result });
-  }
-
-  setMethod(method: string) {
-    return this.assign({ method: method.toUpperCase() });
-  }
-
-  // eslint-disable-next-line prettier/prettier
-  setBody(
-    body:
-      | ReadableStream<Uint8Array>
-      | Blob
-      | BufferSource
-      | FormData
-      | URLSearchParams
-      | string
-  ) {
-    const method = this.request.method.toUpperCase();
-    if (["GET", "HEAD"].includes(method)) {
-      throw new Error(`[HTTP ERROR]${method} body is not allowed.`);
-    }
-    return this.assign({ body });
   }
 
   setUrl(
@@ -283,6 +283,7 @@ export class HttpRequest {
     return this.assign({ url: this.uri });
   }
 
+  // eslint-disable-next-line prettier/prettier
   setQuery(
     query?:
       | string
@@ -290,8 +291,13 @@ export class HttpRequest {
       | [string, string][]
       | Record<string, string>
       | undefined
+      | ((q: URLSearchParams) => URLSearchParams)
   ) {
-    this.url.query = new URLSearchParams(query);
+    if (typeof query === "function") {
+      this.url.query = query(this.url.query);
+    } else {
+      this.url.query = new URLSearchParams(query);
+    }
     return this.assign({ url: this.uri });
   }
 
@@ -309,9 +315,17 @@ export class HttpRequest {
     return this.assign({ url: this.uri });
   }
 
-  setParams(params: Record<string, string> | [string, string][]) {
-    const result: Record<string, string> = this.url.params || {};
-    if (params instanceof Array) {
+  // eslint-disable-next-line prettier/prettier
+  setParams(
+    params:
+      | Record<string, string>
+      | [string, string][]
+      | ((p: Record<string, string>) => Record<string, string>)
+  ) {
+    let result: Record<string, string> = this.url.params || {};
+    if (typeof params === "function") {
+      result = params(result);
+    } else if (params instanceof Array) {
       params.forEach(([value, key]) => {
         result[key] = value;
       });
@@ -340,49 +354,67 @@ export class HttpResponse extends Response {
     this.request = req;
   }
 
-  static json<T = unknown>(res: Response): Promise<T> {
-    return res.json();
+  static json<T = unknown>(): (res: Response) => Promise<T> {
+    return (res: Response) => res.json();
   }
 
-  static blob(res: Response): Promise<Blob> {
-    return res.blob();
+  static blob(): (res: Response) => Promise<Blob> {
+    return (res: Response) => res.blob();
+  }
+
+  static refresh(callback: (err: HttpError) => Promise<any>, timeout = 30000) {
+    return (err: unknown) =>
+      new Promise((resolve, reject) => {
+        const t = setTimeout(() => reject(err), timeout);
+        try {
+          if (isHttpError(err) && isRequest(err.req) && isResponse(err.res)) {
+            if (err.res.status === 401) {
+              return callback(err)
+                .then(() => {
+                  clearTimeout(t);
+                  return fetch(err.req);
+                })
+                .then(resolve);
+            }
+          }
+        } catch (err) {
+          return reject(err);
+        }
+      });
   }
 }
 
-export class HttpError<T> extends Error {
+export class HttpError<Req = Request, Res = Response> extends Error {
   isHttpError = true;
-  http: T;
+  req: Req;
+  res?: Res;
 
-  constructor(error: Error | HttpError<T>, http: T) {
+  constructor(error: Error | HttpError, req: Req, res?: Res) {
     super(error.message);
     this.name = error.name;
     this.stack = error.stack;
-    this.http = http;
+    this.req = req;
+    this.res = res;
   }
 }
 
 export function isHttpSuccess(
-  value: HttpResponse | HttpError<any>
+  value: HttpResponse | HttpError
 ): value is HttpResponse {
   return value.isHttpError === false;
 }
 
-export function isHttpError(value: HttpError<any>): value is HttpError<any> {
-  return value.http instanceof HttpError;
+export function isHttpError(value: unknown): value is HttpError {
+  return value instanceof HttpError;
 }
 
-export function isHttpRequestError(
-  value: HttpError<unknown>
-): value is HttpError<Request> {
-  return value.http instanceof Request;
-}
-
-export function isHttpResponseError(
-  value: HttpError<unknown>
-): value is HttpError<Response> {
-  return value.http instanceof Response;
-}
-
-export function httpObservable(url: string) {
+export function createHttpRequest(url: string) {
   return new HttpRequest(url);
+}
+
+export function isRequest(value: unknown): value is Request {
+  return value instanceof Request;
+}
+export function isResponse(value: unknown): value is Response {
+  return value instanceof Response;
 }

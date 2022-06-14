@@ -1,6 +1,6 @@
 {
   "name": "bamboo-utils",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "scripts": {
     "build": "rollup -c",
     "watch": "rollup -w -c",
