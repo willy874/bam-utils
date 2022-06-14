@@ -27,7 +27,7 @@ const nodePlugins = [
   }),
   commonjs(),
 ]
-const external = []
+const external = ['path', 'fs', 'stream']
 
 export default [{
     input: 'node.ts',
@@ -54,6 +54,7 @@ export default [{
       format: "es"
     }],
     plugins: [dts()],
+    external
   },
   {
     input: 'browser.ts',
