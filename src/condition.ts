@@ -55,6 +55,10 @@ export function isEmpty(value: unknown): boolean {
   return false;
 }
 
+export function isIterable(value: any): value is IterableIterator<any> {
+  return value && typeof value[Symbol.iterator] === "function";
+}
+
 export function isTextIncludes(
   data: Array<string | RegExp>,
   text: string
